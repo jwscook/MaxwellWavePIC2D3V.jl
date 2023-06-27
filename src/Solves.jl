@@ -31,7 +31,7 @@ function neglaplacesolve!(lhs, rhs, ffthelper)
   end
   lhs[1, 1] = 0
   ffthelper.pifft! * rhs
-  ffthelper.pifft! * lhs
+  #ffthelper.pifft! * lhs
 end
 
 @inline denominator(::Explicit, dt², k²) = 1
