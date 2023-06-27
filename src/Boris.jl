@@ -16,7 +16,7 @@ function (boris::ElectrostaticBoris)(vx, vy, vz, Ex, Ey, q_m)
   vγ⁻ = (@SArray [vx, vy, vz]) * γ + Ē₂
   vγ⁺ = vγ⁻ + cross(vγ⁻ + cross(vγ⁻, boris.t), boris.t) * q_m^2 * 2 / (1 + q_m^2 * boris.t²)
   vγ  = vγ⁺ + Ē₂
-  vγ² = vγ[1]^2 + vγ[2]^2 + vγ[3]^2
+  @inbounds vγ² = vγ[1]^2 + vγ[2]^2 + vγ[3]^2
   γ = sqrt(1 + vγ²)
   return vγ / γ
 end
@@ -37,7 +37,7 @@ function (boris::ElectromagneticBoris)(vx, vy, vz, Ex, Ey, Ez, Bx, By, Bz, q_m)
   vγ⁻ = (@SArray [vx, vy, vz]) * γ + Ē₂
   vγ⁺ = vγ⁻ + cross(vγ⁻ + cross(vγ⁻, t), t) * tscale
   vγ  = vγ⁺ + Ē₂
-  vγ² = vγ[1]^2 + vγ[2]^2 + vγ[3]^2
+  @inbounds vγ² = vγ[1]^2 + vγ[2]^2 + vγ[3]^2
   γ = sqrt(1 + vγ²)
   return vγ / γ
 end
