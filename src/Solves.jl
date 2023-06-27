@@ -16,6 +16,10 @@ for funcname in (:smooth!, :smoothinfourierspace!)
   end
 end
 
+# ∂ ρ = - ∇⋅J
+function chargeconservation!(ρ, Jx, Jy, ffthelper, dt)
+  @. ρ += - im * (ffthelper.kx * Jx + ffthelper.ky * Jy) * dt
+end
 
 ## -∇² lhs = rhs
 function neglaplacesolve!(lhs, rhs, ffthelper)

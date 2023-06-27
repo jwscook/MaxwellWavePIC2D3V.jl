@@ -112,18 +112,25 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
       if t % d.ntskip == 0
         @timeit to "Energy" begin
           d.fieldenergy[ti] = mean(abs2, f.EBxyz) / 2
-          totenergy = (d.fieldenergy[ti] + d.kineticenergy[ti]) / (d.fieldenergy[1] + d.kineticenergy[1])
-          @show ti, totenergy
         end
         @timeit to "Momentum" begin
           px, py, pz = 0.0, 0.0, 0.0
+          @assert isapprox(abs(mean(f.Bx)), 0.0, atol=sqrt(eps()) * mean(f.B0))
+          @assert isapprox(abs(mean(f.By)), 0.0, atol=sqrt(eps()) * mean(f.B0))
+          @assert isapprox(abs(mean(f.Bz)), 0.0, atol=sqrt(eps()) * mean(f.B0))
           for i in eachindex(f.Ex)
-            px += real(f.Ey[i]) * real(f.Bz[i]) - real(f.Ez[i]) * real(f.By[i])
-            py += real(f.Ez[i]) * real(f.Bx[i]) - real(f.Ex[i]) * real(f.Bz[i])
-            pz += real(f.Ex[i]) * real(f.By[i]) - real(f.Ey[i]) * real(f.Bx[i])
+            px += real(f.Ey[i]) * real(f.Bz[i] .+ f.B0[3])
+                - real(f.Ez[i]) * real(f.By[i] .+ f.B0[2])
+            py += real(f.Ez[i]) * real(f.Bx[i] .+ f.B0[1])
+                - real(f.Ex[i]) * real(f.Bz[i] .+ f.B0[3])
+            pz += real(f.Ex[i]) * real(f.By[i] .+ f.B0[2])
+                - real(f.Ey[i]) * real(f.Bx[i] .+ f.B0[1])
           end
           d.fieldmomentum[ti] .= (px, py, pz) ./ length(f.Ex)
         end
+        totenergy = (d.fieldenergy[ti] + d.kineticenergy[ti]) / (d.fieldenergy[1] + d.kineticenergy[1])
+        totmomentum = (d.fieldmomentum[ti] + d.particlemomentum[ti]) ./ mean(d.characteristicmomentum[1])
+        @show ti, totenergy, totmomentum
       end
       @timeit to "Field ifft!" begin
         f.ffthelper.pifft! * f.Ax⁰
@@ -207,9 +214,9 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
 
   k0 = d.fieldenergy[1] + d.kineticenergy[1]
 
-  plot(ts, d.fieldenergy, label="Fields")
-  plot!(ts, d.kineticenergy, label="Particles")
-  plot!(ts, d.fieldenergy + d.kineticenergy, label="Total")
+  plot(ts, d.fieldenergy ./ k0, label="Fields")
+  plot!(ts, d.kineticenergy ./ k0, label="Particles")
+  plot!(ts, (d.fieldenergy + d.kineticenergy) ./ k0, label="Total")
   savefig("Energies.png")
 
   fieldmom = cat(d.fieldmomentum..., dims=2)'
@@ -224,6 +231,8 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
 
   wind = findlast(ws .< max(cutoff, 10000 * sqrt(n0)/w0));
   isnothing(wind) && (wind = length(ws)÷2)
+  wind = max(wind, length(ws)÷2)
+
   kxind = min(length(kxs)÷2-1, 128)
   kyind = min(length(kys)÷2-1, 128)
   @views for (F, FS) in diagnosticfields(d)
@@ -250,6 +259,17 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
 #    xlabel!(L"Position x $[v_{A} / \Omega]$");
 #    ylabel!(L"Position y $[v_{A} / \Omega]$")
 #    savefig("PIC2D3V_$(FS)_XY_final.png")
+#
+    try
+      Z = F[:, :, end]'
+      heatmap(xs, ys, Z)
+      xlabel!(L"Position x $[\Omega_c / V_{A}]$");
+      ylabel!(L"Position y $[\Omega_c / V_{A}]$");
+      savefig("PIC2D3V_$(FS)_XY_t_end.png")
+    catch e
+      @info e
+    end
+
     try
       Z = log10.(abs.(fft(F)[2:kxind, 1, 1:wind]))'
       heatmap(kxs[2:kxind], ws[1:wind], Z)

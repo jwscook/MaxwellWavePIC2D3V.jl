@@ -112,3 +112,34 @@ function advect!(plasma, gridparams, dt, to)
   end
 end
 
+function printresolutions(plasma, field, dt, NT, to)
+  Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
+  NX_Lx, NY_Ly = field.gridparams.NX_Lx, field.gridparams.NY_Ly
+  ΔX, ΔY = field.gridparams.ΔX, field.gridparams.ΔY
+  ΔV = cellvolume(field.gridparams)
+  Δl = sqrt(ΔX^2 + ΔY^2)
+  B0 = norm(field.B0)
+  ρₘ = sum(s->numberdensity(s, Lx * Ly) * s.mass, plasma)
+  Va = B0 / sqrt(ρₘ)
+  println("Resolution information:")
+  println("    Va / c ", Va)
+  for (s, species) in enumerate(plasma)
+    println("  Species $s with mass $(species.mass) and charge $(species.charge):")
+    Ω = cyclotronfrequency(species, B0)
+    vrms = rmsvelocity(species)
+    Π = plasmafrequency(species, Lx * Ly)
+    λ_D = vrms / Π
+    r_L = vrms / Ω
+    println("    vrms / c ", vrms)
+    println("    λ_D / Δx ", λ_D / ΔX)
+    println("    λ_D / Δy ", λ_D / ΔY)
+    println("    r_L / Δl ", r_L / Δl)
+    println("    (2π / Π) / Δt ", 2π/Π / dt)
+    println("    (2π / Ω) / Δt ", 2π/Ω / dt)
+    println("    T / (2π / Π) ", dt * NT / (2π/Π))
+    println("    T / (2π / Ω) ", dt * NT / (2π/Ω))
+    println("    (2π / Lx) Va / Ω ", (2π / Lx) * Va / Ω)
+    println("    (2π / Ly) Va / Ω ", (2π / Ly) * Va / Ω)
+  end
+end
+

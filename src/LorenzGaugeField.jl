@@ -1,5 +1,5 @@
 
-struct LorenzGaugeStaggeredField{T, U} <: AbstractLorenzGaugeField
+struct LorenzGaugeField{T, U} <: AbstractLorenzGaugeField
   imex::T
   ρJs⁰::OffsetArray{Float64, 4, Array{Float64, 4}}
   ϕ⁺::Array{ComplexF64, 2}
@@ -32,7 +32,7 @@ struct LorenzGaugeStaggeredField{T, U} <: AbstractLorenzGaugeField
   dt::Float64
 end
 
-function LorenzGaugeStaggeredField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
+function LorenzGaugeField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
     imex::AbstractImEx=Explicit(), buffer=0)
   EBxyz = OffsetArray(zeros(6, NX+2buffer, NY+2buffer), 1:6, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer);
   gps = GridParameters(Lx, Ly, NX, NY)
@@ -40,28 +40,28 @@ function LorenzGaugeStaggeredField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=
   boris = ElectromagneticBoris(dt)
   ρJs = OffsetArray(zeros(4, NX+2buffer, NY+2buffer, nthreads()),
     1:4, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
-  return LorenzGaugeStaggeredField(imex, ρJs,
+  return LorenzGaugeField(imex, ρJs,
     (zeros(ComplexF64, NX, NY) for _ in 1:22)..., EBxyz,
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt)
 end
 
 
-function warmup!(field::LorenzGaugeStaggeredField, plasma, to)
+function warmup!(field::LorenzGaugeField, plasma, to)
   ρcallback(a, b, c, d) = (a,)
   Jcallback(a, b, c, d) = (b, c, d)
   @timeit to "Warmup" begin
     dt = timestep(field)
-    advect!(plasma, field.gridparams, -dt/2, to)
+#    advect!(plasma, field.gridparams, -dt/2, to)
     field.ρJs⁰ .= 0
-    deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, ρcallback)
-    advect!(plasma, field.gridparams, dt/2, to) # back to start, n
+#    deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, ρcallback)
+#    advect!(plasma, field.gridparams, dt/2, to) # back to start, n
     deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, Jcallback)
     reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
   end
 end
 
 
-function loop!(plasma, field::LorenzGaugeStaggeredField, to, t)
+function loop!(plasma, field::LorenzGaugeField, to, t)
   dt = timestep(field)
   Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
   NX_Lx, NY_Ly = field.gridparams.NX_Lx, field.gridparams.NY_Ly
@@ -84,6 +84,7 @@ function loop!(plasma, field::LorenzGaugeStaggeredField, to, t)
   end
 
   @timeit to "Field Solve" begin
+    chargeconservation!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.ffthelper, dt)
     lorenzgauge!(field.imex, field.ϕ⁺,  field.ϕ⁰,  field.ϕ⁻,  field.ρ⁰,  field.ffthelper.k², dt^2)
     lorenzgauge!(field.imex, field.Ax⁺, field.Ax⁰, field.Ax⁻, field.Jx⁰, field.ffthelper.k², dt^2)
     lorenzgauge!(field.imex, field.Ay⁺, field.Ay⁰, field.Ay⁻, field.Jy⁰, field.ffthelper.k², dt^2)
@@ -157,14 +158,15 @@ function loop!(plasma, field::LorenzGaugeStaggeredField, to, t)
         #  v.....v.....v
         @inbounds for i in species.chunks[j]
           Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shape, x[i], y[i])
+          vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
-          x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
-          y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
-          # deposit ρ at (n+1/2)th timestep
-          deposit!(ρJ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
-          x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
-          y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
+          # x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
+          # y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
+          # # deposit ρ at (n+1/2)th timestep
+          # deposit!(ρJ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
+          x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
+          y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
           # deposit J at the (n+1)th point
           deposit!(ρJ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
@@ -187,5 +189,4 @@ function loop!(plasma, field::LorenzGaugeStaggeredField, to, t)
     field.Az⁰ .= field.Az⁺
   end
 end
-
 

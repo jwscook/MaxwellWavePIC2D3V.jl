@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "ae04fa09da73859d3d8b5a98aa961ed552efb2cb"
+project_hash = "43bb22aef38d5ea3a18569f9699be691e92fd30a"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1160,6 +1160,12 @@ version = "0.1.1"
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[deps.ThreadPinning]]
+deps = ["DelimitedFiles", "DocStringExtensions", "Libdl", "LinearAlgebra", "PrecompileTools", "Preferences", "Random"]
+git-tree-sha1 = "136a1264cc4a3a8a9a632fc08836036c77732cff"
+uuid = "811555cd-349b-4f26-b7bc-1f208b848042"
+version = "0.7.7"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]

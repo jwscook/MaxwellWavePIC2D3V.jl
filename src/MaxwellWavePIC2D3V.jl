@@ -33,7 +33,41 @@ include("Species.jl")
 include("GridParameters.jl")
 include("FFTHelper.jl")
 
+
+@inline function (f::AbstractLorenzGaugeField)(s::AbstractShape, xi, yi)
+  NX, NY = f.gridparams.NX, f.gridparams.NY
+  NX_Lx, NY_Ly = f.gridparams.NX_Lx, f.gridparams.NY_Ly
+  Ex = Ey = Ez = Bx = By = Bz = zero(real(eltype(f.EBxyz)))
+  for (j, wy) in depositindicesfractions(s, yi, NY, NY_Ly)
+    for (i, wx) in depositindicesfractions(s, xi, NX, NX_Lx)
+      wxy = wx * wy
+      @muladd Ex = Ex + f.EBxyz[1,i,j] * wxy
+      @muladd Ey = Ey + f.EBxyz[2,i,j] * wxy
+      @muladd Ez = Ez + f.EBxyz[3,i,j] * wxy
+      @muladd Bx = Bx + f.EBxyz[4,i,j] * wxy
+      @muladd By = By + f.EBxyz[5,i,j] * wxy
+      @muladd Bz = Bz + f.EBxyz[6,i,j] * wxy
+    end
+  end
+  return (Ex, Ey, Ez, Bx, By, Bz)
+end
+
+function update!(f::AbstractLorenzGaugeField)
+  f.EBxyz .= 0.0
+  applyperiodicity!((@view f.EBxyz[1, :, :]), f.Ex)
+  applyperiodicity!((@view f.EBxyz[2, :, :]), f.Ey)
+  applyperiodicity!((@view f.EBxyz[3, :, :]), f.Ez)
+  applyperiodicity!((@view f.EBxyz[4, :, :]), f.Bx)
+  applyperiodicity!((@view f.EBxyz[5, :, :]), f.By)
+  applyperiodicity!((@view f.EBxyz[6, :, :]), f.Bz)
+  @views for k in axes(f.EBxyz, 3), j in axes(f.EBxyz, 2), i in 1:3
+    f.EBxyz[i+3, j, k] += f.B0[i]
+  end
+end
+
+
 include("ElectrostaticField.jl")
+include("LorenzGaugeField.jl")
 include("LorenzGaugeStaggeredField.jl")
 
 include("Diagnostics.jl")

@@ -9,10 +9,12 @@ function ElectrostaticBoris(B::AbstractVector, dt::Float64)
   return ElectrostaticBoris(t, t², dt / 2)
 end
 function (boris::ElectrostaticBoris)(vx, vy, vz, Ex, Ey, q_m)
-  Ē₂ = (@SArray [Ex, Ey, 0.0]) * boris.dt_2 * q_m
+  invγ = sqrt(1 - vx^2 - vy^2 - vz^2)
+  q_mγ = q_m * invγ
+  Ē₂ = (@SArray [Ex, Ey, 0.0]) * boris.dt_2 * q_mγ
   v⁻ = (@SArray [vx, vy, vz]) + Ē₂
-  v⁺ = v⁻ + cross(v⁻ + cross(v⁻, boris.t), boris.t) * q_m^2 * 2 / (1 + q_m^2 * boris.t²)
-  return v⁺ + Ē₂
+  v⁺ = v⁻ + cross(v⁻ + cross(v⁻, boris.t), boris.t) * q_mγ^2 * 2 / (1 + q_mγ^2 * boris.t²)
+  return (v⁺ + Ē₂) / invγ
 end
 
 struct ElectromagneticBoris
@@ -21,12 +23,13 @@ struct ElectromagneticBoris
 end
 
 function (boris::ElectromagneticBoris)(vx, vy, vz, Ex, Ey, Ez, Bx, By, Bz, q_m)
-  θ = boris.dt_2 * q_m
+  invγ = sqrt(1 - vx^2 - vy^2 - vz^2)
+  θ = boris.dt_2 * q_m * invγ
   t = (@SArray [Bx, By, Bz]) * θ
   tscale = 2 / (1 + dot(t, t))
   Ē₂ = (@SArray [Ex, Ey, Ez]) * θ
   v⁻ = (@SArray [vx, vy, vz]) + Ē₂
   v⁺ = v⁻ + cross(v⁻ + cross(v⁻, t), t) * tscale
-  return v⁺ + Ē₂
+  return (v⁺ + Ē₂) / invγ
 end
 

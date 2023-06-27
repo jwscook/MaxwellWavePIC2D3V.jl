@@ -23,7 +23,13 @@ function copyto!(dest::Species, src::Species)
   return dest
 end
 
+rmsvelocity(s::Species) = sqrt(mean(abs2, velocities(s)))
 kineticenergy(s::Species) = sum(abs2, velocities(s)) * s.mass / 2 * s.weight
+cyclotronfrequency(s::Species, B0) = s.charge * B0 / s.mass
+numberdensity(s::Species, volume) = (s.weight / volume * length(s.p))
+function plasmafrequency(s::Species, volume)
+  return sqrt(s.charge^2 * numberdensity(s, volume) / s.mass)
+end
 
 function momentum(s::Species, op::F=identity) where F
   #output = sum(op.(velocities(s)), dims=2)[:] * s.mass * s.weight
@@ -48,16 +54,16 @@ function halton(i, base, seed=0.0)
   return mod(result + seed, 1)
 end
 
-#sample(P, base) = halton.(0:P-1, base, 1/sqrt(2));#
-#sample(P, _) = unimod.(rand() .+ reshape(QuasiMonteCarlo.sample(P,1,GoldenSample()), P), 1)
-sample(P, _) = unimod.(rand() .+ rand(P), 1)
+#sample(P, base, seed) = halton.(0:P-1, base, 1/sqrt(2));#
+#sample(P, _, _) = unimod.(rand() .+ reshape(QuasiMonteCarlo.sample(P,1,GoldenSample()), P), 1)
+sample(P, _, _) = rand(P)
 
 function Species(P, vth, density, shape::AbstractShape; Lx, Ly, charge=1, mass=1)
-  x  = Lx * sample(P, 2);
-  y  = Ly * sample(P, 3);
-  vx = vth * erfinv.(2sample(P, 5) .- 1) * vth;
-  vy = vth * erfinv.(2sample(P, 7) .- 1) * vth;
-  vz = vth * erfinv.(2sample(P, 9) .- 1) * vth;
+  x  = Lx * sample(P, 2, 0.0);
+  y  = Ly * sample(P, 3, 0.0);
+  vx = erfinv.(2sample(P, 5, 0.0) .- 1);
+  vy = erfinv.(2sample(P, 7, 0.0) .- 1);
+  vz = erfinv.(2sample(P, 9, 0.0) .- 1);
   vx .-= mean(vx)
   vy .-= mean(vy)
   vz .-= mean(vz)
