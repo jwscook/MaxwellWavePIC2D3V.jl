@@ -153,20 +153,21 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
             end
           end
         end
-        average!(d.Exs, f.Ex)
-        average!(d.Eys, f.Ey)
-        average!(d.Ezs, f.Ez)
-        average!(d.Bxs, f.Bx)
-        average!(d.Bys, f.By)
-        average!(d.Bzs, f.Bz)
-        average!(d.Axs, f.Ax⁰)
-        average!(d.Ays, f.Ay⁰)
-        average!(d.Azs, f.Az⁰)
-        average!(d.ϕs, f.ϕ⁰)
-        average!(d.ρs, f.ρ⁰)
-        average!(d.Jxs, f.Jx⁰)
-        average!(d.Jys, f.Jy⁰)
-        average!(d.Jzs, f.Jz⁰)
+        t0 = Threads.@spawn average!(d.Exs, f.Ex)
+        t1 = Threads.@spawn average!(d.Eys, f.Ey)
+        t2 = Threads.@spawn average!(d.Ezs, f.Ez)
+        t3 = Threads.@spawn average!(d.Bxs, f.Bx)
+        t4 = Threads.@spawn average!(d.Bys, f.By)
+        t5 = Threads.@spawn average!(d.Bzs, f.Bz)
+        t6 = Threads.@spawn average!(d.Axs, f.Ax⁰)
+        t7 = Threads.@spawn average!(d.Ays, f.Ay⁰)
+        t8 = Threads.@spawn average!(d.Azs, f.Az⁰)
+        t9 = Threads.@spawn average!(d.ϕs, f.ϕ⁰)
+        ta = Threads.@spawn average!(d.ρs, f.ρ⁰)
+        tb = Threads.@spawn average!(d.Jxs, f.Jx⁰)
+        tc = Threads.@spawn average!(d.Jys, f.Jy⁰)
+        td = Threads.@spawn average!(d.Jzs, f.Jz⁰)
+        wait.((t0, t1, t2, t3, t4, t5, t6,t7, t8, t9, ta, tb, tc, td))
       end
       @timeit to "Field fft!" begin
         f.ffthelper.pfft! * f.Ax⁰
