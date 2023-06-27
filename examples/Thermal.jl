@@ -59,7 +59,7 @@ function pic()
   vth = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / ELEMENTARY_MASS) / m_lengthScale * m_timeScale
   #M * n0
   #Va / SPEED_OF_LIGHT, B0 / sqrt(M * n0)
-  #Ωi = B0 / M
+  Ωi = B0 / M
   #Ωi, Ωi * m_timeScale
   ld = vth / Πe
   #lD0 / m_lengthScale, ld
@@ -70,7 +70,7 @@ function pic()
     Ly = Lx * NY / NX
     dt = Lx / NX / 8
     P = NX * NY * 8
-    NT = 2^11 #2^10#2^14
+    NT = 2^13 #2^10#2^14
     Δx = Lx / NX
     Δx = Lx / NX
     Δy = Ly / NY
