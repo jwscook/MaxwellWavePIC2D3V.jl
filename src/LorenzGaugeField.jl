@@ -51,12 +51,35 @@ function warmup!(field::LorenzGaugeField, plasma, to)
   Jcallback(a, b, c, d) = (b, c, d)
   @timeit to "Warmup" begin
     dt = timestep(field)
-#    advect!(plasma, field.gridparams, -dt/2, to)
-    field.ρJs⁰ .= 0
-#    deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, ρcallback)
-#    advect!(plasma, field.gridparams, dt/2, to) # back to start, n
-    deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, Jcallback)
-    reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
+    #field.ρjs⁰ .= 0
+    #advect!(plasma, field.gridparams, -3dt/2, to) # n-3/2
+    #deposit!(field.ρjs⁰, plasma, field.gridparams, dt, to, ρcallback)
+    #advect!(plasma, field.gridparams, dt/2, to) # n -1
+    #deposit!(field.ρjs⁰, plasma, field.gridparams, dt, to, jcallback)
+    #reduction!(field.ρ⁰, field.jx⁰, field.jy⁰, field.jz⁰, field.ρjs⁰)
+    #neglaplacesolve!(field.ϕ⁻, field.ρ⁰, field.ffthelper)
+    #neglaplacesolve!(field.Ax⁻, field.Jx⁰, field.ffthelper)
+    #neglaplacesolve!(field.Ay⁻, field.Jy⁰, field.ffthelper)
+    #neglaplacesolve!(field.Az⁻, field.Jz⁰, field.ffthelper)
+
+    #field.ρJs⁰ .= 0
+    #advect!(plasma, field.gridparams, dt/2, to) # n-1/2
+    #deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, ρcallback)
+    #advect!(plasma, field.gridparams, dt/2, to) # n
+    #deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, Jcallback)
+    #reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
+    #neglaplacesolve!(field.ϕ⁰, field.ρ⁰, field.ffthelper)
+    #neglaplacesolve!(field.Ax⁰, field.Jx⁰, field.ffthelper)
+    #neglaplacesolve!(field.Ay⁰, field.Jy⁰, field.ffthelper)
+    #neglaplacesolve!(field.Az⁰, field.Jz⁰, field.ffthelper)
+
+
+    #advect!(plasma, field.gridparams, -dt/2, to) # n - 1/2
+    #deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, ρcallback)
+    #advect!(plasma, field.gridparams, dt/2, to) # n + 0
+    #reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
+
+#    neglaplacesolve!(field.ϕ⁻, -field.ρ⁰, field.ffthelper)
   end
 end
 
@@ -70,17 +93,15 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
   # At this point Ai⁰ stores the (n+0)th timestep value and Ai⁻ the (n-1)th
   #               ϕ⁰  stores the (n-1/2)th timestep value and ϕ⁻ the (n-3/2)th
   @timeit to "Field Forward FT" begin
-    #@show mean(field.ρ⁰), std(field.ρ⁰)
-    #@show mean(field.Jx⁰), std(field.Jx⁰)
-    #@show mean(field.Jy⁰), std(field.Jy⁰)
-    #@show mean(field.Jz⁰), std(field.Jz⁰)
     field.ffthelper.pfft! * field.ρ⁰;
     field.ffthelper.pfft! * field.Jx⁰;
     field.ffthelper.pfft! * field.Jy⁰;
     field.ffthelper.pfft! * field.Jz⁰;
-    #smoothinfourierspace!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ffthelper)
-# not necessary given E, B calculated from derivatives of ϕ, Ai
-#    field.ρ⁰[1, 1] = field.Jx⁰[1, 1] = field.Jy⁰[1, 1] = field.Jz⁰[1, 1] = 0
+    # smoothinfourierspace!(field.Jx⁰, field.ffthelper) # better for energy, worse for momentum
+    # smoothinfourierspace!(field.Jy⁰, field.ffthelper) # better for energy, worse for momentum
+    # smoothinfourierspace!(field.Jz⁰, field.ffthelper) # better for energy, worse for momentum
+    # not necessary given E, B calculated from derivatives of ϕ, Ai
+    #field.ρ⁰[1, 1] = field.Jx⁰[1, 1] = field.Jy⁰[1, 1] = field.Jz⁰[1, 1] = 0
   end
 
   @timeit to "Field Solve" begin
@@ -89,10 +110,6 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     lorenzgauge!(field.imex, field.Ax⁺, field.Ax⁰, field.Ax⁻, field.Jx⁰, field.ffthelper.k², dt^2)
     lorenzgauge!(field.imex, field.Ay⁺, field.Ay⁰, field.Ay⁻, field.Jy⁰, field.ffthelper.k², dt^2)
     lorenzgauge!(field.imex, field.Az⁺, field.Az⁰, field.Az⁻, field.Jz⁰, field.ffthelper.k², dt^2)
-#    @show mean(field.ϕ⁺), std(field.ϕ⁺)
-#    @show mean(field.Ax⁺), std(field.Ax⁺)
-#    @show mean(field.Ay⁺), std(field.Ay⁺)
-#    @show mean(field.Az⁺), std(field.Az⁺)
   end
 
   # at this point (ϕ, Ai) stores the (n+1)th timestep value and (ϕ⁻, Ai⁻) the nth
@@ -128,12 +145,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     field.ffthelper.pifft! * field.Bz
   end
   @timeit to "Field Update" update!(field)
-#  @show mean(field.Bx), std(field.Bx)
-#  @show mean(field.By), std(field.By)
-#  @show mean(field.Bz), std(field.Bz)
-#  @show mean(field.Ex), std(field.Ex)
-#  @show mean(field.Ey), std(field.Ey)
-#  @show mean(field.Ez), std(field.Ez)
+
   # we now have the E and B fields at n+1/2
 
   @timeit to "Particle Loop" begin
@@ -161,13 +173,8 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
           vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
-          # x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
-          # y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
-          # # deposit ρ at (n+1/2)th timestep
-          # deposit!(ρJ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
           x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
           y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
-          # deposit J at the (n+1)th point
           deposit!(ρJ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
         end
