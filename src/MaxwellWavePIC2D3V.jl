@@ -54,12 +54,13 @@ end
 
 function update!(f::AbstractLorenzGaugeField)
   f.EBxyz .= 0.0
-  applyperiodicity!((@view f.EBxyz[1, :, :]), f.Ex)
-  applyperiodicity!((@view f.EBxyz[2, :, :]), f.Ey)
-  applyperiodicity!((@view f.EBxyz[3, :, :]), f.Ez)
-  applyperiodicity!((@view f.EBxyz[4, :, :]), f.Bx)
-  applyperiodicity!((@view f.EBxyz[5, :, :]), f.By)
-  applyperiodicity!((@view f.EBxyz[6, :, :]), f.Bz)
+  t0 = @spawn applyperiodicity!((@view f.EBxyz[1, :, :]), f.Ex)
+  t1 = @spawn applyperiodicity!((@view f.EBxyz[2, :, :]), f.Ey)
+  t2 = @spawn applyperiodicity!((@view f.EBxyz[3, :, :]), f.Ez)
+  t3 = @spawn applyperiodicity!((@view f.EBxyz[4, :, :]), f.Bx)
+  t4 = @spawn applyperiodicity!((@view f.EBxyz[5, :, :]), f.By)
+  t5 = @spawn applyperiodicity!((@view f.EBxyz[6, :, :]), f.Bz)
+  wait.((t0, t1, t2, t3, t4, t5))
   @views for k in axes(f.EBxyz, 3), j in axes(f.EBxyz, 2), i in 1:3
     f.EBxyz[i+3, j, k] += f.B0[i]
   end
