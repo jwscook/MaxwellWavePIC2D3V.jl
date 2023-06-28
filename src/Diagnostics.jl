@@ -213,11 +213,11 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   kxs = 2π/Lx .* collect(0:NXd-1) .* (vc / w0);
   kys = 2π/Ly .* collect(0:NYd-1) .* (vc / w0);
 
-  k0 = d.fieldenergy[1] + d.kineticenergy[1]
+  energy0 = d.fieldenergy[1] + d.kineticenergy[1]
 
-  plot(ts, d.fieldenergy ./ k0, label="Fields")
-  plot!(ts, d.kineticenergy ./ k0, label="Particles")
-  plot!(ts, (d.fieldenergy + d.kineticenergy) ./ k0, label="Total")
+  plot(ts, d.fieldenergy ./ energy0, label="Fields")
+  plot!(ts, d.kineticenergy ./ energy0, label="Particles")
+  plot!(ts, (d.fieldenergy + d.kineticenergy) ./ energy0, label="Total")
   savefig("Energies.png")
 
   fieldmom = cat(d.fieldmomentum..., dims=2)'
@@ -260,12 +260,12 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
 #    xlabel!(L"Position x $[v_{A} / \Omega]$");
 #    ylabel!(L"Position y $[v_{A} / \Omega]$")
 #    savefig("PIC2D3V_$(FS)_XY_final.png")
-#
+
     try
       Z = F[:, :, end]'
       heatmap(xs, ys, Z)
-      xlabel!(L"Position x $[\Omega_c / V_{A}]$");
-      ylabel!(L"Position y $[\Omega_c / V_{A}]$");
+      xlabel!(L"Position x $[V_{A} / \Omega_{i}]$");
+      ylabel!(L"Position y $[V_{A} / \Omega_{i}]$");
       savefig("PIC2D3V_$(FS)_XY_t_end.png")
     catch e
       @info e
@@ -274,8 +274,8 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
     try
       Z = log10.(abs.(fft(F)[2:kxind, 1, 1:wind]))'
       heatmap(kxs[2:kxind], ws[1:wind], Z)
-      xlabel!(L"Wavenumber x $[\Omega_c / V_{A}]$");
-      ylabel!(L"Frequency $[\Omega_c]$")
+      xlabel!(L"Wavenumber x $[\Omega_{i} / V_{A}]$");
+      ylabel!(L"Frequency $[\Omega_{i}]$")
       savefig("PIC2D3V_$(FS)_WKsumy_c.png")
     catch e
       @info e
@@ -283,8 +283,8 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
     try
       Z = log10.(abs.(fft(F)[1, 2:kyind, 1:wind]))'
       heatmap(kys[2:kyind], ws[1:wind], Z)
-      xlabel!(L"Wavenumber y $[\Omega_c / V_{A}]$");
-      ylabel!(L"Frequency $[\Omega_c]$")
+      xlabel!(L"Wavenumber y $[\Omega_{i} / V_{A}]$");
+      ylabel!(L"Frequency $[\Omega_{i}]$")
       savefig("PIC2D3V_$(FS)_WKsumx_c.png")
     catch e
       @info e

@@ -30,7 +30,7 @@ function pic()
   vthe / SPEED_OF_LIGHT
   lD0 = vthe / Wp
   Ωi0 = ELEMENTARY_CHARGE * B / M / ELEMENTARY_MASS
-  kresolution = 1
+  kresolution = 8
   L = Va / Ωi0 * 2π * kresolution
   @show REQUIRED_GRID_CELLS = L / lD0
 
@@ -48,9 +48,9 @@ function pic()
 
   to = TimerOutput()
 
-  NQ = 16
-  NX = 2^8 * NQ
-  NY = 2^8 ÷ NQ
+  NQ = 4
+  NX = 2^11 * NQ
+  NY = 2^11 ÷ NQ
 
   L0 = L / m_lengthScale
   B0 = B / (m_magneticPotentialScale / m_lengthScale)
@@ -86,11 +86,11 @@ function pic()
     #field = MaxwellWavePIC2D3V.ElectrostaticField(NX, NY, Lx, Ly, dt=dt, B0x=B0)
     #diagnostics = MaxwellWavePIC2D3V.ElectrostaticDiagnostics(NX, NY, NT, ntskip, 2)
     ntskip = 16 #4#prevpow(2, round(Int, 10 / 6vth)) ÷ 4
-    ngskip = 1
+    ngskip = 4
     @show NT ÷ ntskip
     #dt = 2dl #/6vth
     #dt = dl / vth
-    field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0z=B0,
+    field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
       imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
     #field = MaxwellWavePIC2D3V.LorenzGaugeStaggeredField(NX, NY, Lx, Ly, dt=dt, B0z=B0,
     #  imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)

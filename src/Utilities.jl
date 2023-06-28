@@ -4,6 +4,7 @@ function applyperiodicity!(a::Array, oa)
   NX, NY = size(a)
   @assert length(size(a)) == 2
   @assert length(size(oa)) == 2
+  # this can't be threaded because the mod operator may make a data race
   for j in axes(oa, 2), i in axes(oa, 1)
     a[unimod(i, NX), unimod(j, NY)] += oa[i, j]
   end
@@ -13,8 +14,11 @@ function applyperiodicity!(oa, a::Array)
   NX, NY = size(a)
   @assert length(size(a)) == 2
   @assert length(size(oa)) == 2
-  for j in axes(oa, 2), i in axes(oa, 1)
-     oa[i, j] += real(a[unimod(i, NX), unimod(j, NY)])
+  # this one can be threaded because the mod operator is on the rhs
+  @threads for j in axes(oa, 2)
+     for i in axes(oa, 1)
+       oa[i, j] += real(a[unimod(i, NX), unimod(j, NY)])
+    end
   end
 end
 
@@ -27,15 +31,15 @@ end
 
 function reduction!(a, b, c, z)
   @assert size(z, 1) == 4
-  @. a = 0.0
-  @. b = 0.0
-  @. c = 0.0
+  a .= 0.0
   @views for k in axes(z, 4)
     applyperiodicity!(a, z[1, :, :, k])
   end
+  b .= 0.0
   @views for k in axes(z, 4)
     applyperiodicity!(b, z[2, :, :, k])
   end
+  c .= 0.0
   @views for k in axes(z, 4)
     applyperiodicity!(c, z[3, :, :, k])
   end
@@ -43,19 +47,19 @@ end
 
 function reduction!(a, b, c, d, z)
   @assert size(z, 1) == 4
-  @. a = 0.0
-  @. b = 0.0
-  @. c = 0.0
-  @. d = 0.0
+  a .= 0.0
   @views for k in axes(z, 4)
     applyperiodicity!(a, z[1, :, :, k])
   end
+  b .= 0.0
   @views for k in axes(z, 4)
     applyperiodicity!(b, z[2, :, :, k])
   end
+  c .= 0.0
   @views for k in axes(z, 4)
     applyperiodicity!(c, z[3, :, :, k])
   end
+  d .= 0.0
   @views for k in axes(z, 4)
     applyperiodicity!(d, z[4, :, :, k])
   end
