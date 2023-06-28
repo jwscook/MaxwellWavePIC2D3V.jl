@@ -117,14 +117,14 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
   # Eʰ = -∇ϕ⁺ - (A⁺ - A⁰)/dt
   # Bʰ = ∇x(A⁺ + A⁰)/2
   #
-  #  E.....E.....E
-  #  B.....B.....B
-  #  ϕ.....ϕ.....ϕ
-  #  -..A..0..A..+..A
-  #  ρ.....ρ.....ρ
-  #  -..J..0..J..+..J
-  #  x.....x.....x
-  #  -..v..0..v..+..v
+  #  ...E.....E... E⁰'⁵ = -∇ ϕ⁰'⁵ - (A¹ - A⁰) / Δt
+  #  ...B.....B... B⁰'⁵ = ∇ x (A¹ + A⁰) / 2
+  #  ...ϕ.....ϕ... ∂ₜ^2 ϕ⁰'⁵ = ∇² ϕ + (ρ⁻⁰'⁵ - ∇⋅J)
+  #  A..0..A..+..A ∂ₜ^2 A = ∇² A + J
+  #  ...ρ.....ρ... ∂ₜρ = -∇⋅J
+  #  J.....J.....J J¹ = q n(x¹) v¹
+  #  v.....v.....v v¹ = v⁰ + q Δt (E⁰'⁵ + v x B⁰'⁵) / m
+  #  x.....x.....x x¹ = x⁰ + Δt (v¹ + v⁰) / 2
   @timeit to "Calculate E, B" begin
     @. field.Ex = -im * field.ffthelper.kx * field.ϕ⁺
     @. field.Ey = -im * field.ffthelper.ky * field.ϕ⁺
