@@ -23,7 +23,7 @@ function copyto!(dest::Species, src::Species)
   return dest
 end
 
-rmsvelocity(s::Species) = sqrt(mean(abs2, velocities(s)))
+thermalvelocity(s::Species) = std(velocities(s))
 kineticenergy(s::Species) = sum(abs2, velocities(s)) * s.mass / 2 * s.weight
 cyclotronfrequency(s::Species, B0) = s.charge * B0 / s.mass
 numberdensity(s::Species, volume) = (s.weight / volume * length(s.p))

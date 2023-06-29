@@ -173,8 +173,8 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
           vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
-          x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
-          y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
+            x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
+            y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
           deposit!(ρJ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
         end

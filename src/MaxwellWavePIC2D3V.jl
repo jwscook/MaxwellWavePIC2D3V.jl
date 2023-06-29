@@ -37,19 +37,24 @@ include("FFTHelper.jl")
 @inline function (f::AbstractLorenzGaugeField)(s::AbstractShape, xi, yi)
   NX, NY = f.gridparams.NX, f.gridparams.NY
   NX_Lx, NY_Ly = f.gridparams.NX_Lx, f.gridparams.NY_Ly
-  Ex = Ey = Ez = Bx = By = Bz = zero(real(eltype(f.EBxyz)))
+#  Ex = Ey = Ez = Bx = By = Bz = zero(real(eltype(f.EBxyz)))
+  output = MVector{6, real(eltype(f.EBxyz))}(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
   for (j, wy) in depositindicesfractions(s, yi, NY, NY_Ly)
     for (i, wx) in depositindicesfractions(s, xi, NX, NX_Lx)
       wxy = wx * wy
-      @muladd Ex = Ex + f.EBxyz[1,i,j] * wxy
-      @muladd Ey = Ey + f.EBxyz[2,i,j] * wxy
-      @muladd Ez = Ez + f.EBxyz[3,i,j] * wxy
-      @muladd Bx = Bx + f.EBxyz[4,i,j] * wxy
-      @muladd By = By + f.EBxyz[5,i,j] * wxy
-      @muladd Bz = Bz + f.EBxyz[6,i,j] * wxy
+      #Ex += f.EBxyz[1, i, j] * wxy
+      #Ey += f.EBxyz[2, i, j] * wxy
+      #Ez += f.EBxyz[3, i, j] * wxy
+      #Bx += f.EBxyz[4, i, j] * wxy
+      #By += f.EBxyz[5, i, j] * wxy
+      #Bz += f.EBxyz[6, i, j] * wxy
+      @simd for h in 1:6
+          output[h] += f.EBxyz[h, i, j] * wxy
+      end
     end
   end
-  return (Ex, Ey, Ez, Bx, By, Bz)
+  return output
+  #return (Ex, Ey, Ez, Bx, By, Bz)
 end
 
 function update!(f::AbstractLorenzGaugeField)
