@@ -22,8 +22,8 @@ function pic()
 
   n = 1e20
   B = 2.1
-  Mi = 2 * 1836
-  Me = 64#1
+  Mi = 64 #2 * 1836
+  Me = 1
 
   TeeV = 1e4
   Va = B / sqrt(MU_0 * Mi * ELEMENTARY_MASS * n)
@@ -31,7 +31,7 @@ function pic()
   vthe = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / Me / ELEMENTARY_MASS)
   lD0 = vthe / Wp
   Ωi0 = ELEMENTARY_CHARGE * B / Mi / ELEMENTARY_MASS
-  kresolution = 1 # 8
+  kresolution = 1
   L = Va / Ωi0 * 2π * kresolution
   @show REQUIRED_GRID_CELLS = L / lD0
 
@@ -67,7 +67,7 @@ function pic()
   #@timeit to "Initialisation" begin
     Lx = L0
     Ly = Lx * NY / NX
-    dt = Lx / NX * 4 # /8
+    dt = Lx / NX / 8
     P = NX * NY * 8
     NT = 2^14 #2^10#2^14
     Δx = Lx / NX
