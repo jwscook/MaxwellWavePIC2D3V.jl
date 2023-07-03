@@ -55,7 +55,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
   # At this point Ai⁰ stores the (n+0)th timestep value and Ai⁻ the (n-1)th
   #               ϕ⁰  stores the (n-1/2)th timestep value and ϕ⁻ the (n-3/2)th
   @timeit to "Field Forward FT" begin
-    field.ffthelper.pfft! * field.ρ⁰;
+    #field.ffthelper.pfft! * field.ρ⁰; # field.ρ⁰ should always be in Fourier space
     field.ffthelper.pfft! * field.Jx⁰;
     field.ffthelper.pfft! * field.Jy⁰;
     field.ffthelper.pfft! * field.Jz⁰;
