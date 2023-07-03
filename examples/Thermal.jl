@@ -1,5 +1,5 @@
 using ProgressMeter, TimerOutputs, Plots, FFTW, Random, StaticNumbers
-using ThreadPinning
+using ThreadPinning, JLD2
 
 @static if Base.Sys.islinux()
   pinthreads(:cores)
@@ -22,19 +22,20 @@ function pic()
 
   n = 1e20
   B = 2.1
-  M = 2 * 1836
+  Mi = 64 #2 * 1836
+  Me = 1
+
   TeeV = 1e4
-  Va = B / sqrt(MU_0 * M * ELEMENTARY_MASS * n)
-  Wp = ELEMENTARY_CHARGE * sqrt(n / ELEMENTARY_MASS / EPSILON_0)
-  vthe = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / ELEMENTARY_MASS)
-  vthe / SPEED_OF_LIGHT
+  Va = B / sqrt(MU_0 * Mi * ELEMENTARY_MASS * n)
+  Wp = ELEMENTARY_CHARGE * sqrt(n / Me / ELEMENTARY_MASS / EPSILON_0)
+  vthe = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / Me / ELEMENTARY_MASS)
   lD0 = vthe / Wp
-  Ωi0 = ELEMENTARY_CHARGE * B / M / ELEMENTARY_MASS
-  kresolution = 8
+  Ωi0 = ELEMENTARY_CHARGE * B / Mi / ELEMENTARY_MASS
+  kresolution = 1
   L = Va / Ωi0 * 2π * kresolution
   @show REQUIRED_GRID_CELLS = L / lD0
 
-  m_lengthScale = L
+  @show m_lengthScale = L
   m_timeScale = m_lengthScale / SPEED_OF_LIGHT;
   m_electricPotentialScale = ELEMENTARY_MASS *
                              pow(m_lengthScale / m_timeScale, 2) /
@@ -49,17 +50,15 @@ function pic()
   to = TimerOutput()
 
   NQ = 4
-  NX = 2^11 * NQ
-  NY = 2^11 ÷ NQ
+  NX = 2^11 * NQ #10
+  NY = 2^11 ÷ NQ #10
 
   L0 = L / m_lengthScale
   B0 = B / (m_magneticPotentialScale / m_lengthScale)
   n0 = n / m_numberDensityScale
-  Πe = sqrt(ELEMENTARY_CHARGE^2 * n / EPSILON_0 / ELEMENTARY_MASS) * m_timeScale
-  vth = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / ELEMENTARY_MASS) / m_lengthScale * m_timeScale
-  #M * n0
-  #Va / SPEED_OF_LIGHT, B0 / sqrt(M * n0)
-  Ωi = B0 / M
+  Πe = sqrt(ELEMENTARY_CHARGE^2 * n / EPSILON_0 / Me / ELEMENTARY_MASS) * m_timeScale
+  vth = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / Me / ELEMENTARY_MASS) / m_lengthScale * m_timeScale
+  Ωi = B0 / Mi
   #Ωi, Ωi * m_timeScale
   ld = vth / Πe
   #lD0 / m_lengthScale, ld
@@ -70,7 +69,7 @@ function pic()
     Ly = Lx * NY / NX
     dt = Lx / NX / 8
     P = NX * NY * 8
-    NT = 2^13 #2^10#2^14
+    NT = 2^14 #2^10#2^14
     Δx = Lx / NX
     Δx = Lx / NX
     Δy = Ly / NY
@@ -101,9 +100,9 @@ function pic()
     #shape = MaxwellWavePIC2D3V.NGPWeighting();#
     #shape = MaxwellWavePIC2D3V.AreaWeighting();#
     electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shape;
-      Lx=Lx, Ly=Ly, charge=-1, mass=1)
-    ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(M), n0, shape;
-      Lx=Lx, Ly=Ly, charge=1, mass=M)
+      Lx=Lx, Ly=Ly, charge=-1, mass=Me)
+    ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0, shape;
+      Lx=Lx, Ly=Ly, charge=1, mass=Mi)
     sort!(electrons, Lx / NX, Ly / NY)
     sort!(ions, Lx / NX, Ly / NY)
     plasma = [electrons, ions]
@@ -122,10 +121,17 @@ function pic()
 
   show(to)
 
-  return diagnostics, field, plasma, n0, Va, Ωi, NT
+  return diagnostics, field, plasma, n0, Va, Ωi, NT, B0
 end
 using StatProfilerHTML
-diagnostics, field, plasma, n0, vcharacteristic, omegachar, NT = pic()
+diagnostics, field, plasma, n0, vcharacteristic, omegacharacteristic, NT, B0 = pic()
 
-MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegachar, NT; cutoff=20)
+
+MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegacharacteristic, NT;
+                              cutoff=20 * omegacharacteristic)
+
+const filecontents = [i for i in readlines(open(@__FILE__))]
+
+@save "$(hash(filecontents)" filecontents diagnostics field plasma n0 vcharacteristic omegacharacteristic NT B0
+
 
