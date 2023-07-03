@@ -89,14 +89,13 @@ end
 end
 
 
-defaultdepositcallback(qw_ΔV, vx, vy, vz) = (1.0, vx, vy, vz) .* qw_ΔV
-function deposit!(ρJs, plasma, gridparams, dt, to)
+function deposit!(Js, plasma, gridparams, dt, to)
   Lx, Ly = gridparams.Lx, gridparams.Ly
   NX_Lx, NY_Ly = gridparams.NX_Lx, gridparams.NY_Ly
   ΔV = cellvolume(gridparams)
   @timeit to "Particle Loop" begin
-    @threads for j in axes(ρJs, 4)
-      ρJ = @view ρJs[:, :, :, j]
+    @threads for j in axes(Js, 4)
+      J = @view Js[:, :, :, j]
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
         x = @view positions(species)[1, :]
@@ -105,7 +104,7 @@ function deposit!(ρJs, plasma, gridparams, dt, to)
         vy = @view velocities(species)[2, :]
         vz = @view velocities(species)[3, :]
         for i in species.chunks[j]
-          deposit!(ρJ, species.shape, x[i], y[i], NX_Lx, NY_Ly,
+          deposit!(J, species.shape, x[i], y[i], NX_Lx, NY_Ly,
                    qw_ΔV * vx[i], qw_ΔV * vy[i], qw_ΔV * vz[i])
         end
       end
