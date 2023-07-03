@@ -30,6 +30,7 @@ function (boris::ElectromagneticBoris)(vx, vy, vz, Ex, Ey, Ez, Bx, By, Bz, q_m)
   v² = vx^2 + vy^2 + vz^2
   @assert v² <= 1 "v² = $(v²), vx = $vx, vy = $vy, vz = $vz"
   γ = 1 / sqrt(1 - v²)
+  @assert isfinite(γ) "γ = $γ, v² = $v²"
   θ = boris.dt_2 * q_m
   t = (@SArray [Bx, By, Bz]) * θ
   tscale = 2 / (1 + dot(t, t))
@@ -38,7 +39,8 @@ function (boris::ElectromagneticBoris)(vx, vy, vz, Ex, Ey, Ez, Bx, By, Bz, q_m)
   vγ⁺ = vγ⁻ + cross(vγ⁻ + cross(vγ⁻, t), t) * tscale
   vγ  = vγ⁺ + Ē₂
   @inbounds vγ² = vγ[1]^2 + vγ[2]^2 + vγ[3]^2
-  γ = sqrt(1 + vγ²)
+  γ = 1 / sqrt(1 + vγ²)
+  @assert isfinite(γ)
   return vγ / γ
 end
 

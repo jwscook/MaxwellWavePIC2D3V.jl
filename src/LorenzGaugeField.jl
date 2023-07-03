@@ -1,7 +1,7 @@
 
 struct LorenzGaugeField{T, U} <: AbstractLorenzGaugeField
   imex::T
-  ρJs⁰::OffsetArray{Float64, 4, Array{Float64, 4}}
+  Js⁰::OffsetArray{Float64, 4, Array{Float64, 4}}
   ϕ⁺::Array{ComplexF64, 2}
   ϕ⁰::Array{ComplexF64, 2}
   Ax⁺::Array{ComplexF64, 2}
@@ -34,49 +34,15 @@ function LorenzGaugeField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
   gps = GridParameters(Lx, Ly, NX, NY)
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   boris = ElectromagneticBoris(dt)
-  ρJs = OffsetArray(zeros(4, NX+2buffer, NY+2buffer, nthreads()),
-    1:4, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
-  return LorenzGaugeField(imex, ρJs,
+  Js = OffsetArray(zeros(3, NX+2buffer, NY+2buffer, nthreads()),
+    1:3, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
+  return LorenzGaugeField(imex, Js,
     (zeros(ComplexF64, NX, NY) for _ in 1:18)..., EBxyz, # 22
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt)
 end
 
-
 function warmup!(field::LorenzGaugeField, plasma, to)
-  ρcallback(a, b, c, d) = (a,)
-  Jcallback(a, b, c, d) = (b, c, d)
-  @timeit to "Warmup" begin
-    dt = timestep(field)
-    #field.ρjs⁰ .= 0
-    #advect!(plasma, field.gridparams, -3dt/2, to) # n-3/2
-    #deposit!(field.ρjs⁰, plasma, field.gridparams, dt, to, ρcallback)
-    #advect!(plasma, field.gridparams, dt/2, to) # n -1
-    #deposit!(field.ρjs⁰, plasma, field.gridparams, dt, to, jcallback)
-    #reduction!(field.ρ⁰, field.jx⁰, field.jy⁰, field.jz⁰, field.ρjs⁰)
-    #neglaplacesolve!(field.ϕ⁻, field.ρ⁰, field.ffthelper)
-    #neglaplacesolve!(field.Ax⁻, field.Jx⁰, field.ffthelper)
-    #neglaplacesolve!(field.Ay⁻, field.Jy⁰, field.ffthelper)
-    #neglaplacesolve!(field.Az⁻, field.Jz⁰, field.ffthelper)
-
-    #field.ρJs⁰ .= 0
-    #advect!(plasma, field.gridparams, dt/2, to) # n-1/2
-    #deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, ρcallback)
-    #advect!(plasma, field.gridparams, dt/2, to) # n
-    #deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, Jcallback)
-    #reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
-    #neglaplacesolve!(field.ϕ⁰, field.ρ⁰, field.ffthelper)
-    #neglaplacesolve!(field.Ax⁰, field.Jx⁰, field.ffthelper)
-    #neglaplacesolve!(field.Ay⁰, field.Jy⁰, field.ffthelper)
-    #neglaplacesolve!(field.Az⁰, field.Jz⁰, field.ffthelper)
-
-
-    #advect!(plasma, field.gridparams, -dt/2, to) # n - 1/2
-    #deposit!(field.ρJs⁰, plasma, field.gridparams, dt, to, ρcallback)
-    #advect!(plasma, field.gridparams, dt/2, to) # n + 0
-    #reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
-
-#    neglaplacesolve!(field.ϕ⁻, -field.ρ⁰, field.ffthelper)
-  end
+  return nothing
 end
 
 
@@ -149,9 +115,9 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
   # we now have the E and B fields at n+1/2
 
   @timeit to "Particle Loop" begin
-    @threads for j in axes(field.ρJs⁰, 4)
-      ρJ⁰ = @view field.ρJs⁰[:, :, :, j]
-      ρJ⁰ .= 0
+    @threads for j in axes(field.Js⁰, 4)
+      J⁰ = @view field.Js⁰[:, :, :, j]
+      J⁰ .= 0
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
         q_m = species.charge / species.mass
@@ -170,19 +136,21 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
         #  v.....v.....v
         @inbounds for i in species.chunks[j]
           Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shape, x[i], y[i])
+          @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
           vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
-            x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
-            y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
-          deposit!(ρJ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
+          @assert all(isfinite, (x[i], y[i], vxi, vyi, vx[i], vy[i]))
+          x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
+          y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
+          deposit!(J⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
         end
       end
     end
   end
   @timeit to "Field Reduction" begin
-    reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
+    reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰)
   end
 
   #@timeit to "Copy over buffers" begin

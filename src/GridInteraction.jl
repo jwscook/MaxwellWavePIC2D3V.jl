@@ -90,8 +90,7 @@ end
 
 
 defaultdepositcallback(qw_ΔV, vx, vy, vz) = (1.0, vx, vy, vz) .* qw_ΔV
-function deposit!(ρJs, plasma, gridparams, dt, to,
-        cb::F=defaultdepositcallback) where F
+function deposit!(ρJs, plasma, gridparams, dt, to)
   Lx, Ly = gridparams.Lx, gridparams.Ly
   NX_Lx, NY_Ly = gridparams.NX_Lx, gridparams.NY_Ly
   ΔV = cellvolume(gridparams)
@@ -107,7 +106,7 @@ function deposit!(ρJs, plasma, gridparams, dt, to,
         vz = @view velocities(species)[3, :]
         for i in species.chunks[j]
           deposit!(ρJ, species.shape, x[i], y[i], NX_Lx, NY_Ly,
-                   cb(qw_ΔV, qw_ΔV * vx[i], qw_ΔV * vy[i], qw_ΔV * vz[i])...)
+                   qw_ΔV * vx[i], qw_ΔV * vy[i], qw_ΔV * vz[i])
         end
       end
     end
@@ -124,44 +123,15 @@ function deposit!(z::AbstractArray{<:Number, 2}, s::AbstractShape, x, y, NX_Lx, 
   end
 end
 
-function deposit!(z::AbstractArray{<:Number, 3}, s::AbstractShape, x, y, NX_Lx, NY_Ly, w1)
+function deposit!(z::AbstractArray{<:Number, 3}, s::AbstractShape, x, y, NX_Lx, NY_Ly, w1, w2, w3)
   NV, NX, NY = size(z)
-  @assert NV == 4
-  for (j, wy) in depositindicesfractions(s, y, NY, NY_Ly)
-    for (i, wx) in depositindicesfractions(s, x, NX, NX_Lx)
-      wxy = wx * wy
-      @muladd z[1,i,j] = z[1,i,j] + wxy * w1
-      #@muladd z[2,i,j] = z[2,i,j] + wxy * w2
-      #@muladd z[3,i,j] = z[3,i,j] + wxy * w3
-      #@muladd z[4,i,j] = z[4,i,j] + wxy * w4
-    end
-  end
-end
-
-function deposit!(z::AbstractArray{<:Number, 3}, s::AbstractShape, x, y, NX_Lx, NY_Ly, w2, w3, w4)
-  NV, NX, NY = size(z)
-  @assert NV == 4
-  for (j, wy) in depositindicesfractions(s, y, NY, NY_Ly)
-    for (i, wx) in depositindicesfractions(s, x, NX, NX_Lx)
-      wxy = wx * wy
-      #@muladd z[1,i,j] = z[1,i,j] + wxy * w1
-      @muladd z[2,i,j] = z[2,i,j] + wxy * w2
-      @muladd z[3,i,j] = z[3,i,j] + wxy * w3
-      @muladd z[4,i,j] = z[4,i,j] + wxy * w4
-    end
-  end
-end
-
-function deposit!(z, s::AbstractShape, x, y, NX_Lx, NY_Ly, w1, w2, w3, w4)
-  NV, NX, NY = size(z)
-  @assert NV == 4
+  @assert NV == 3
   for (j, wy) in depositindicesfractions(s, y, NY, NY_Ly)
     for (i, wx) in depositindicesfractions(s, x, NX, NX_Lx)
       wxy = wx * wy
       @muladd z[1,i,j] = z[1,i,j] + wxy * w1
       @muladd z[2,i,j] = z[2,i,j] + wxy * w2
       @muladd z[3,i,j] = z[3,i,j] + wxy * w3
-      @muladd z[4,i,j] = z[4,i,j] + wxy * w4
     end
   end
 end
