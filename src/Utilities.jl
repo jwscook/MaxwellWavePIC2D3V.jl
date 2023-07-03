@@ -15,7 +15,7 @@ function applyperiodicity!(oa, a::Array)
   @assert length(size(a)) == 2
   @assert length(size(oa)) == 2
   # this one can be threaded because the mod operator is on the rhs
-  @threads for j in axes(oa, 2)
+  for j in axes(oa, 2)
      for i in axes(oa, 1)
        oa[i, j] += real(a[unimod(i, NX), unimod(j, NY)])
     end
@@ -135,6 +135,9 @@ function printresolutions(plasma, field, dt, NT, to)
     λ_D = vth / Π
     r_L = vth / Ω
     println("    vth / c ", vth)
+    println("    c / vth ", 1 / vth)
+    println("    vth dt / Δl ", vth * dt / Δl)
+    println("    Δl / (vth dt) ", 1/(vth * dt / Δl))
     println("    λ_D / Δx ", λ_D / ΔX)
     println("    λ_D / Δy ", λ_D / ΔY)
     println("    r_L / Δl ", r_L / Δl)

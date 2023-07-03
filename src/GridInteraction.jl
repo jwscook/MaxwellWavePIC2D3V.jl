@@ -66,8 +66,8 @@ end
 @inline indices(::BSplineWeighting{N}, i) where N = (i-fld(N, 2)):(i+cld(N, 2))
 
 for N in 0:2:10
-  @eval _bsplineinputs(::BSplineWeighting{@stat $(N+1)}, i, centre, ) = (i, 1 - centre)
-  @eval function _bsplineinputs(::BSplineWeighting{@stat $N}, i, centre, )
+  @eval _bsplineinputs(::BSplineWeighting{@stat $(N+1)}, i, centre) = (i, 1 - centre)
+  @eval function _bsplineinputs(::BSplineWeighting{@stat $N}, i, centre)
     q = centre > 0.5
     return (i + q, q + 0.5 - centre)
   end

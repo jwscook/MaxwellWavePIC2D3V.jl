@@ -4,13 +4,9 @@ struct LorenzGaugeField{T, U} <: AbstractLorenzGaugeField
   ρJs⁰::OffsetArray{Float64, 4, Array{Float64, 4}}
   ϕ⁺::Array{ComplexF64, 2}
   ϕ⁰::Array{ComplexF64, 2}
-  ϕ⁻::Array{ComplexF64, 2}
   Ax⁺::Array{ComplexF64, 2}
   Ay⁺::Array{ComplexF64, 2}
   Az⁺::Array{ComplexF64, 2}
-  Ax⁻::Array{ComplexF64, 2}
-  Ay⁻::Array{ComplexF64, 2}
-  Az⁻::Array{ComplexF64, 2}
   Ax⁰::Array{ComplexF64, 2}
   Ay⁰::Array{ComplexF64, 2}
   Az⁰::Array{ComplexF64, 2}
@@ -41,7 +37,7 @@ function LorenzGaugeField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
   ρJs = OffsetArray(zeros(4, NX+2buffer, NY+2buffer, nthreads()),
     1:4, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
   return LorenzGaugeField(imex, ρJs,
-    (zeros(ComplexF64, NX, NY) for _ in 1:22)..., EBxyz,
+    (zeros(ComplexF64, NX, NY) for _ in 1:18)..., EBxyz, # 22
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt)
 end
 
@@ -106,10 +102,14 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
 
   @timeit to "Field Solve" begin
     chargeconservation!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.ffthelper, dt)
-    lorenzgauge!(field.imex, field.ϕ⁺,  field.ϕ⁰,  field.ϕ⁻,  field.ρ⁰,  field.ffthelper.k², dt^2)
-    lorenzgauge!(field.imex, field.Ax⁺, field.Ax⁰, field.Ax⁻, field.Jx⁰, field.ffthelper.k², dt^2)
-    lorenzgauge!(field.imex, field.Ay⁺, field.Ay⁰, field.Ay⁻, field.Jy⁰, field.ffthelper.k², dt^2)
-    lorenzgauge!(field.imex, field.Az⁺, field.Az⁰, field.Az⁻, field.Jz⁰, field.ffthelper.k², dt^2)
+    lorenzgauge!(field.imex, field.ϕ⁺,  field.ϕ⁰,  field.ρ⁰,  field.ffthelper.k², dt^2)
+    lorenzgauge!(field.imex, field.Ax⁺, field.Ax⁰, field.Jx⁰, field.ffthelper.k², dt^2)
+    lorenzgauge!(field.imex, field.Ay⁺, field.Ay⁰, field.Jy⁰, field.ffthelper.k², dt^2)
+    lorenzgauge!(field.imex, field.Az⁺, field.Az⁰, field.Jz⁰, field.ffthelper.k², dt^2)
+    #lorenzgauge!(field.imex, field.ϕ⁺,  field.ϕ⁰,  field.ϕ⁻,  field.ρ⁰,  field.ffthelper.k², dt^2)
+    #lorenzgauge!(field.imex, field.Ax⁺, field.Ax⁰, field.Ax⁻, field.Jx⁰, field.ffthelper.k², dt^2)
+    #lorenzgauge!(field.imex, field.Ay⁺, field.Ay⁰, field.Ay⁻, field.Jy⁰, field.ffthelper.k², dt^2)
+    #lorenzgauge!(field.imex, field.Az⁺, field.Az⁰, field.Az⁻, field.Jz⁰, field.ffthelper.k², dt^2)
   end
 
   # at this point (ϕ, Ai) stores the (n+1)th timestep value and (ϕ⁻, Ai⁻) the nth
@@ -185,15 +185,15 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     reduction!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.ρJs⁰)
   end
 
-  @timeit to "Copy over buffers" begin
-    field.ϕ⁻ .= field.ϕ⁰
-    field.ϕ⁰ .= field.ϕ⁺
-    field.Ax⁻ .= field.Ax⁰
-    field.Ax⁰ .= field.Ax⁺
-    field.Ay⁻ .= field.Ay⁰
-    field.Ay⁰ .= field.Ay⁺
-    field.Az⁻ .= field.Az⁰
-    field.Az⁰ .= field.Az⁺
-  end
+  #@timeit to "Copy over buffers" begin
+  #  field.ϕ⁻ .= field.ϕ⁰
+  #  field.ϕ⁰ .= field.ϕ⁺
+  #  field.Ax⁻ .= field.Ax⁰
+  #  field.Ax⁰ .= field.Ax⁺
+  #  field.Ay⁻ .= field.Ay⁰
+  #  field.Ay⁰ .= field.Ay⁺
+  #  field.Az⁻ .= field.Az⁰
+  #  field.Az⁰ .= field.Az⁺
+  #end
 end
 

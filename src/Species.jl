@@ -61,6 +61,7 @@ sample(P, _, _) = rand(P)
 function Species(P, vth, density, shape::AbstractShape; Lx, Ly, charge=1, mass=1)
   x  = Lx * sample(P, 2, 0.0);
   y  = Ly * sample(P, 3, 0.0);
+  # us pvi to first mean momentum and then velocity, to save RAM
   pvx = erfinv.(2sample(P, 5, 0.0) .- 1);
   pvy = erfinv.(2sample(P, 7, 0.0) .- 1);
   pvz = erfinv.(2sample(P, 9, 0.0) .- 1);
@@ -70,11 +71,14 @@ function Species(P, vth, density, shape::AbstractShape; Lx, Ly, charge=1, mass=1
   pvx .*= mass * (vth / sqrt(2)) / std(pvx);
   pvy .*= mass * (vth / sqrt(2)) / std(pvy);
   pvz .*= mass * (vth / sqrt(2)) / std(pvz);
-  γ = sqrt.(1 .+ (pvx.^2 + pvy.^2 + pvz.^2) ./ mass^2)
-  @. pvx = pvx / mass / γ
-  @. pvy = pvy / mass / γ
-  @. pvz = pvz / mass / γ
-  @assert all(i-> (pvx[i]^2 + pvy[i]^2 + pvz[i]^2) <= 1, 1:P)
+  # now convert to velocity
+  @threads for i in 1:P
+    γ = sqrt(1 + (pvx[i]^2 + pvy[i]^2 + pvz[i]^2) / mass^2)
+    pvx[i] /= (mass * γ)
+    pvy[i] /= (mass * γ)
+    pvz[i] /= (mass * γ)
+    all(pvx[i]^2 + pvy[i]^2 + pvz[i]^2 <= 1)
+  end
   p = collect(1:P)
   xyv = Matrix(hcat(x, y, pvx, pvy, pvz)')
   chunks = collect(Iterators.partition(1:P, ceil(Int, P/nthreads())))
