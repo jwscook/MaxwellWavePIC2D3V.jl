@@ -39,7 +39,7 @@ function (boris::ElectromagneticBoris)(vx, vy, vz, Ex, Ey, Ez, Bx, By, Bz, q_m)
   vγ⁺ = vγ⁻ + cross(vγ⁻ + cross(vγ⁻, t), t) * tscale
   vγ  = vγ⁺ + Ē₂
   @inbounds vγ² = vγ[1]^2 + vγ[2]^2 + vγ[3]^2
-  γ = 1 / sqrt(1 + vγ²)
+  γ = sqrt(1 + vγ²)
   @assert isfinite(γ)
   return vγ / γ
 end

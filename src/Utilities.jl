@@ -47,36 +47,6 @@ end
 
 warmup!(field::AbstractField, plasma, to) = field
 
-#function warmup!(ρ, Jx, Jy, Jz, Js, plasma, gridparams, dt, to)
-#  Lx, Ly = gridparams.Lx, gridparams.Ly
-#  NX_Lx, NY_Ly = gridparams.NX_Lx, gridparams.NY_Ly
-#  ΔV = cellvolume(gridparams)
-#  @timeit to "Particle Loop" begin
-#    @threads for j in axes(Js, 4)
-#      J = @view Js[:, :, :, j]
-#      J .= 0
-#      for species in plasma
-#        qw_ΔV = species.charge * species.weight / ΔV
-#        x = @view positions(species)[1, :]
-#        y = @view positions(species)[2, :]
-#        vx = @view velocities(species)[1, :]
-#        vy = @view velocities(species)[2, :]
-#        vz = @view velocities(species)[3, :]
-#        for i in species.chunks[j]
-#          x[i] = unimod(x[i] + vx[i] * dt, Lx)
-#          y[i] = unimod(y[i] + vy[i] * dt, Ly)
-#          deposit!(J, species.shape, x[i], y[i], NX_Lx, NY_Ly,
-#            vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
-#          x[i] = unimod(x[i] - vx[i] * dt, Lx)
-#          y[i] = unimod(y[i] - vy[i] * dt, Ly)
-#        end
-#      end
-#    end
-#  end
-#  @timeit to "Field Reduction" begin
-#    reduction!(Jx, Jy, Jz, Js)
-#  end
-#end
 function advect!(plasma, gridparams, dt, to)
   Lx, Ly = gridparams.Lx, gridparams.Ly
   @timeit to "Advect Loop" begin
