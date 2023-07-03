@@ -126,11 +126,11 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
       end
     end
     @timeit to "Field Reduction" begin
-      reduction!(field.ρ⁺, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.Js⁺)
+      reduction!(field.Jx⁺, field.Jy⁺, field.Jz⁺, field.Js⁺)
       #field.Js⁺ .= 0 # dont zero it here!
     end
     @timeit to "Field Forward FT" begin
-      field.ffthelper.pfft! * field.ρ⁺;
+#      field.ffthelper.pfft! * field.ρ⁺;
       field.ffthelper.pfft! * field.Jx⁺;
       field.ffthelper.pfft! * field.Jy⁺;
       field.ffthelper.pfft! * field.Jz⁺;
@@ -140,7 +140,7 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
       field.Jz⁺[1, 1] = 0
     end
     @timeit to "Field Solve" begin
-      chargeconservation!(field.ρ⁰, field.ρ⁻, field.Jx⁰, field.Jy⁰, field.ffthelper, dt)
+      chargeconservation!(field.ρ⁺, field.ρ⁰, field.Jxz⁺, field.Jy⁺, field.ffthelper, dt)
       # at this point ϕ stores the nth timestep value and ϕ⁻ the (n-1)th
       lorenzgauge!(field.fieldimex, field.ϕ⁺, field.ϕ⁰,  field.ϕ⁻, field.ρ⁺, field.ρ⁰, field.ρ⁻, field.ffthelper.k², dt^2, field.sourceimex)
       lorenzgauge!(field.fieldimex, field.Ax⁺, field.Ax⁰, field.Ax⁻, field.Jx⁺, field.Jx⁰, field.Jx⁻, field.ffthelper.k², dt^2, field.sourceimex)
@@ -172,6 +172,8 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
   @timeit to "Copy over buffers" begin
     field.Js⁻ .= field.Js⁰
     field.Js⁰ .= field.Js⁺
+    field.ρs⁻ .= field.ρs⁰
+    field.ρs⁰ .= field.ρs⁺
     field.ϕ⁻ .= field.ϕ⁰
     field.ϕ⁰ .= field.ϕ⁺
     field.Ax⁻ .= field.Ax⁰
