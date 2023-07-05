@@ -1,5 +1,5 @@
 using ProgressMeter, TimerOutputs, Plots, FFTW, Random, StaticNumbers
-using ThreadPinning, JLD2
+using ThreadPinning, JLD2, ThreadsX
 
 @static if Base.Sys.islinux()
   pinthreads(:cores)
@@ -91,9 +91,7 @@ function pic()
     #dt = dl / vth
     field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
       imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
-    #field = MaxwellWavePIC2D3V.LorenzGaugeStaggeredField(NX, NY, Lx, Ly, dt=dt, B0z=B0,
-    #  imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
-    #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0x=B0,
+    #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
     #  buffer=10, rtol=sqrt(eps()), maxiters=1000)
     diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
@@ -115,9 +113,15 @@ function pic()
 
   MaxwellWavePIC2D3V.printresolutions(plasma, field, dt, NT, to)
   #MaxwellWavePIC2D3V.warmup!(field, plasma, to)
+
+  progress = Progress(NT; showspeed=true)
   for t in 0:NT-1;
     MaxwellWavePIC2D3V.loop!(plasma, field, to, t)
     MaxwellWavePIC2D3V.diagnose!(diagnostics, field, plasma, t, to)
+    ProgressMeter.next!(progress;
+      showvalues=[(:t,t), (:energy, diagnostics.totalenergy),
+                  (:momentum, diagnostics.totalmomentum)])
+    t % 2^12 == 0 && ThreadsX.map(s->sort!(s, Lx / NX, Ly / NY), plasma)
   end
 
   show(to)
