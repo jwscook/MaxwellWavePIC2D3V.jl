@@ -43,7 +43,7 @@ function invmul!(y, dftm::DFTMatrix{T}, x::AbstractVector{U}) where {T, U}
 end
 
 
-struct OddEvenMatrix{T} <: AbstractArray{T, 2}
+struct OddEvenMatrix <: AbstractArray{Bool, 2}
   N::Int
   linearindices::LinearIndices{2, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}
   cartesianindices::CartesianIndices{2, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}
@@ -53,26 +53,37 @@ Base.size(oem::OddEvenMatrix) = (oem.N, oem.N)
 
 Base.getindex(oem::OddEvenMatrix, i::Int) = getindex(oem, oem.cartesianindices[i])
 
-function Base.getindex(oem::OddEvenMatrix{T}, I::Vararg{Int, U})::Bool where {T, U}
+function Base.getindex(oem::OddEvenMatrix, I::Vararg{Int, T})::Bool where {T}
   i, j = I
   return i <= (oem.N ÷ 2) ? j == 2 * (i-1) + 1 : j == 2 * (i - (oem.N ÷ 2))
 end
 
+struct FFTMatrix
+  N::Int
+  I2::Diagonal{Bool, Vector{Bool}}
+  D2::SparseMatrixCSC{Complex{Int64}, Int64}
+  R2::Matrix{Int}
+  Ps::Vector{OddEvenMatrix}
+end
+function FFTMatrix(N)
+  @assert ispow2(N)
+  I2 = I(2)
+  D2 = sparse([1 0; 0 -im])
+  R2 = [1 1; 1 -1]
+  return FFTMatrix(N, I2, D2, R2, [OddEvenMatrix(2^i) for i in 1:log2(N)])
+end
+Base.size(fftm::FFTMatrix) = (fftm.N, fftm.N)
 
-#struct FFTMatrix{T}
-#  N::Int
-#  I2::Matrix{Int}
-#  D2::Matrix{Complex{Int}}
-#  R2::Matrix{Int}
-#end
-#function FFTMatrix(N)
-#  I2 = [1 0; 0 1]
-#  D2 = [1 0; 0 -im]
-#  R2 = [1 1; 1 -1]
-#  return FFTMatrix{Float32}(N, I2, D2, R2)
-#end
-#Base.size(fftm::FFTMatrix) = (fftm.N, fftm.N)
-#
+function Base.getindex(fftm::FFTMatrix, I::Vararg{Int, T})::Bool where {T}
+  i, j = I
+  n = fftm.N
+  while n > 2
+    n = n ÷ 2
+    ii = i ÷ 2
+    jj = j ÷ 2
+  end
+end
+
 #function Base.mul!(y, fftm::FFTMatrix, x)
 #end
 ￼

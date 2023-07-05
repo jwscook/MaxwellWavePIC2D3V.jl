@@ -21,10 +21,10 @@ function chargeconservation!(ρ⁺, ρ⁻, Jx, Jy, ffthelper, dt)
   @. ρ⁺ = ρ⁻ - im * (ffthelper.kx * Jx + ffthelper.ky * Jy) * dt
 end
 function chargeconservation!(ρ, Jx, Jy, ffthelper, dt)
-  @. ρ += - im * (ffthelper.kx * Jx + ffthelper.ky * Jy) * dt
-#  return chargeconservation!(ρ, ρ, Jx, Jy, ffthelper, dt)
+  return chargeconservation!(ρ, ρ, Jx, Jy, ffthelper, dt)
 end
 
+# ∇⋅E = ρ = - ∇^2 ϕ
 ## -∇² lhs = rhs
 function neglaplacesolve!(lhs, rhs, ffthelper)
   ffthelper.pfft! * rhs
