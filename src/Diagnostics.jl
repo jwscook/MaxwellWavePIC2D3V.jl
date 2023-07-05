@@ -12,6 +12,8 @@ struct ElectrostaticDiagnostics <: AbstractDiagnostics
   ngskip::Int
   ti::Ref{Int64}
   makegifs::Bool
+  totalenergy::Ref{Float64}
+  totalmomentum::Vector{Float64}
 end
 
 function generatestorage(NX, NY, ND, nscalar, nmomentum, nstorage)
@@ -27,7 +29,7 @@ function ElectrostaticDiagnostics(NX, NY, NT, ntskip, ngskip=1; makegifs=false)
   scalarstorage, momentumstorage, fieldstorage = generatestorage(
     NX÷ngskip, NY÷ngskip, NT÷ntskip, 2, 2, 3)
   return ElectrostaticDiagnostics(scalarstorage..., momentumstorage...,
-    fieldstorage..., ntskip, ngskip, Ref(0), makegifs)
+    fieldstorage..., ntskip, ngskip, Ref(0), makegifs, Ref(0.0), zeros(3))
 end
 
 struct LorenzGaugeDiagnostics <: AbstractDiagnostics
@@ -54,6 +56,8 @@ struct LorenzGaugeDiagnostics <: AbstractDiagnostics
   ngskip::Int
   ti::Ref{Int64}
   makegifs::Bool
+  totalenergy::Ref{Float64}
+  totalmomentum::Vector{Float64}
 end
 
 function LorenzGaugeDiagnostics(NX, NY, NT::Int, ntskip::Int, ngskip=1;
@@ -63,7 +67,7 @@ function LorenzGaugeDiagnostics(NX, NY, NT::Int, ntskip::Int, ngskip=1;
   scalarstorage, momentumstorage, fieldstorage = generatestorage(
     NX÷ngskip, NY÷ngskip, NT÷ntskip, 2, 3, 14)
   return LorenzGaugeDiagnostics(scalarstorage..., momentumstorage...,
-    fieldstorage..., ntskip, ngskip, Ref(0), makegifs)
+    fieldstorage..., ntskip, ngskip, Ref(0), makegifs, Ref(0.0), zeros(3))
 end
 
 
@@ -130,7 +134,8 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
         end
         totenergy = (d.fieldenergy[ti] + d.kineticenergy[ti]) / (d.fieldenergy[1] + d.kineticenergy[1])
         totmomentum = (d.fieldmomentum[ti] + d.particlemomentum[ti]) ./ mean(d.characteristicmomentum[1])
-        @show ti, totenergy, totmomentum
+        d.totalenergy[] = totenergy
+        d.totalmomentum .= totmomentum
       end
       @timeit to "Field ifft!" begin
         f.ffthelper.pifft! * f.Ax⁰
