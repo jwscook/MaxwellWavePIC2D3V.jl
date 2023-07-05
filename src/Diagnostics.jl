@@ -281,7 +281,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
       heatmap(kxs[2:kxind], ws[1:wind], Z)
       xlabel!(L"Wavenumber x $[\Omega_{i} / V_{A}]$");
       ylabel!(L"Frequency $[\Omega_{i}]$")
-      savefig("PIC2D3V_$(FS)_WKsumy_c.png")
+      savefig("PIC2D3V_$(FS)_WKky0.png")
     catch e
       @info e
     end
@@ -290,7 +290,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
       heatmap(kys[2:kyind], ws[1:wind], Z)
       xlabel!(L"Wavenumber y $[\Omega_{i} / V_{A}]$");
       ylabel!(L"Frequency $[\Omega_{i}]$")
-      savefig("PIC2D3V_$(FS)_WKsumx_c.png")
+      savefig("PIC2D3V_$(FS)_WKkx0.png")
     catch e
       @info e
     end
