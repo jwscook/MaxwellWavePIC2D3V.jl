@@ -76,6 +76,7 @@ end
 
 include("ElectrostaticField.jl")
 include("LorenzGaugeField.jl")
+include("LorenzGaugeSemiImplicitField.jl")
 
 include("Diagnostics.jl")
 include("Solves.jl")

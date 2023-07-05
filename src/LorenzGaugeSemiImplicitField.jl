@@ -1,22 +1,11 @@
 
-function warmup!(field::LorenzGaugeSemiImplicitField, plasma, to)
-  @timeit to "Warmup" begin
-    dt = timestep(field)
-    warmup!(field.ρ⁻, field.Jx⁻, field.Jy⁻, field.Jz⁻, field.Js⁻, plasma, field.gridparams, -dt, to)
-    warmup!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰, plasma, field.gridparams, dt, to)
-    warmup!(field.ρ⁺, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.Js⁺, plasma, field.gridparams, dt, to)
-    advect!(plasma, field.gridparams, -dt, to) # advect back to start
-  end
-end
-
-
 struct LorenzGaugeSemiImplicitField{T, U, V} <: AbstractLorenzGaugeField
   fieldimex::T
   sourceimex::U
   Js⁻::OffsetArray{Float64, 4, Array{Float64, 4}}
   Js⁰::OffsetArray{Float64, 4, Array{Float64, 4}}
   Js⁺::OffsetArray{Float64, 4, Array{Float64, 4}}
-  ρJsᵗ::OffsetArray{Float64, 4, Array{Float64, 4}}
+  Jsᵗ::OffsetArray{Float64, 4, Array{Float64, 4}}
   ϕ⁺::Array{ComplexF64, 2}
   ϕ⁰::Array{ComplexF64, 2}
   ϕ⁻::Array{ComplexF64, 2}
@@ -64,7 +53,7 @@ function LorenzGaugeSemiImplicitField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B
   gps = GridParameters(Lx, Ly, NX, NY)
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   boris = ElectromagneticBoris(dt)
-  Js = OffsetArray(zeros(4, NX+2buffer, NY+2buffer, nthreads()),
+  Js = OffsetArray(zeros(3, NX+2buffer, NY+2buffer, nthreads()),
     1:3, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
   return LorenzGaugeSemiImplicitField(fieldimex, sourceimex, Js, deepcopy(Js), deepcopy(Js),
     deepcopy(Js), (zeros(ComplexF64, NX, NY) for _ in 1:30)..., EBxyz,
@@ -81,7 +70,7 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
   firstloop = true
   iters = 0
   while true
-    if (iters > 0) && (iters > field.maxiters || isapprox(field.ρJsᵗ, field.Js⁺, rtol=field.rtol, atol=0))
+    if (iters > 0) && (iters > field.maxiters || isapprox(field.Jsᵗ, field.Js⁺, rtol=field.rtol, atol=0))
       for species in plasma
         x = positions(species)
         v = velocities(species)
@@ -126,11 +115,11 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
       end
     end
     @timeit to "Field Reduction" begin
-      reduction!(field.ρ⁺, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.Js⁺)
+      reduction!(field.Jx⁺, field.Jy⁺, field.Jz⁺, field.Js⁺)
       #field.Js⁺ .= 0 # dont zero it here!
     end
     @timeit to "Field Forward FT" begin
-      field.ffthelper.pfft! * field.ρ⁺;
+#      field.ffthelper.pfft! * field.ρ⁺;
       field.ffthelper.pfft! * field.Jx⁺;
       field.ffthelper.pfft! * field.Jy⁺;
       field.ffthelper.pfft! * field.Jz⁺;
@@ -140,7 +129,7 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
       field.Jz⁺[1, 1] = 0
     end
     @timeit to "Field Solve" begin
-      chargeconservation!(field.ρ⁰, field.ρ⁻, field.Jx⁰, field.Jy⁰, field.ffthelper, dt)
+      chargeconservation!(field.ρ⁺, field.ρ⁰, field.Jx⁺, field.Jy⁺, field.ffthelper, dt)
       # at this point ϕ stores the nth timestep value and ϕ⁻ the (n-1)th
       lorenzgauge!(field.fieldimex, field.ϕ⁺, field.ϕ⁰,  field.ϕ⁻, field.ρ⁺, field.ρ⁰, field.ρ⁻, field.ffthelper.k², dt^2, field.sourceimex)
       lorenzgauge!(field.fieldimex, field.Ax⁺, field.Ax⁰, field.Ax⁻, field.Jx⁺, field.Jx⁰, field.Jx⁻, field.ffthelper.k², dt^2, field.sourceimex)
@@ -172,6 +161,8 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
   @timeit to "Copy over buffers" begin
     field.Js⁻ .= field.Js⁰
     field.Js⁰ .= field.Js⁺
+    field.ρ⁻ .= field.ρ⁰
+    field.ρ⁰ .= field.ρ⁺
     field.ϕ⁻ .= field.ϕ⁰
     field.ϕ⁰ .= field.ϕ⁺
     field.Ax⁻ .= field.Ax⁰
@@ -180,6 +171,17 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
     field.Ay⁰ .= field.Ay⁺
     field.Az⁻ .= field.Az⁰
     field.Az⁰ .= field.Az⁺
+  end
+end
+
+
+function warmup!(field::LorenzGaugeSemiImplicitField, plasma, to)
+  @timeit to "Warmup" begin
+    dt = timestep(field)
+    warmup!(field.ρ⁻, field.Jx⁻, field.Jy⁻, field.Jz⁻, field.Js⁻, plasma, field.gridparams, -dt, to)
+    warmup!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰, plasma, field.gridparams, dt, to)
+    warmup!(field.ρ⁺, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.Js⁺, plasma, field.gridparams, dt, to)
+    advect!(plasma, field.gridparams, -dt, to) # advect back to start
   end
 end
 
