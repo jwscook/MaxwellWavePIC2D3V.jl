@@ -43,6 +43,22 @@ function invmul!(y, dftm::DFTMatrix{T}, x::AbstractVector{U}) where {T, U}
 end
 
 
+struct OddEvenMatrix{T} <: AbstractArray{T, 2}
+  N::Int
+  linearindices::LinearIndices{2, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}
+  cartesianindices::CartesianIndices{2, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}
+end
+OddEvenMatrix(N) = OddEvenMatrix{Float32}(N, LinearIndices((N, N)), CartesianIndices((N, N)))
+Base.size(oem::OddEvenMatrix) = (oem.N, oem.N)
+
+Base.getindex(oem::OddEvenMatrix, i::Int) = getindex(oem, oem.cartesianindices[i])
+
+function Base.getindex(oem::OddEvenMatrix{T}, I::Vararg{Int, U})::Bool where {T, U}
+  i, j = I
+  return i <= (oem.N ÷ 2) ? j == 2 * (i-1) + 1 : j == 2 * (i - (oem.N ÷ 2))
+end
+
+
 #struct FFTMatrix{T}
 #  N::Int
 #  I2::Matrix{Int}

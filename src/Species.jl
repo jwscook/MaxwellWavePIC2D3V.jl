@@ -58,10 +58,70 @@ end
 #sample(P, _, _) = unimod.(rand() .+ reshape(QuasiMonteCarlo.sample(P,1,GoldenSample()), P), 1)
 sample(P, _, _) = rand(P)
 
-function Species(P, vth, density, shape::AbstractShape; Lx, Ly, charge=1, mass=1)
-  x  = Lx * sample(P, 2, 0.0);
-  y  = Ly * sample(P, 3, 0.0);
-  # us pvi to first mean momentum and then velocity, to save RAM
+function bfieldvrotationmatrix(bvector)
+  B0 = norm(bvector)
+  bpitch = B0 == 0 ? 1.0 : bvector[3] / B0
+  iszero(B0) && (B0 = 1.0)
+
+  sinacosbpitch = sin(acos(bpitch))
+  cx = -bvector[2] / B0
+  cy = bvector[1] / B0
+
+  r00 = cx * cx * (1 - bpitch) + bpitch
+  r01 = cx * cy * (1 - bpitch)
+  r02 = cy * sinacosbpitch
+  r10 = r01
+  r11 = cy * cy * (1 - bpitch) + bpitch
+  r12 = -cx * sinacosbpitch
+  r20 = -r02
+  r21 = -r12
+  r22 = bpitch
+  return [r00 r01 r02; r10 r11 r12; r20 r21 r22]
+end
+
+function ringbeaminitialiser(P, vth, mass, vdrift, bvector, pitch)
+  rvparas = erfinv.(2sample(P, 5, 0.0) .- 1);
+  vdriftpara = vth * rvpara + vdrift * pitch;
+  vdriftperp = vdrift * sqrt(1 - pitch^2);
+  vperps = zeros(P)
+  vperp_min = max(0.0, vdriftperp - 6.0 * vth)
+  vperp_peak = (drift_perp + sqrt(vdriftperp^2 + 2vth^2)) / 2;
+  if thermal_velocity > 0
+    for in in 1:P
+      while true
+        vperp = vperp_min + rand() * 2.0 * 6.0 * vth
+        vf_eval = vperp / vperp_peak * exp(-((vperp - vdriftperp)^2 / vth^2));
+        @assert vf_eval <= 1 "Error in the accept reject algorithm, f > 1"
+        if (rand() < vf_eval)
+          vperps[i] = vperp
+          break
+        end
+      end
+    end
+  end
+  gyroangle = 2π .* sample(P, 8, 0.0)
+  vperp1 = vperps .* cos(gyroangle)
+  vperp2 = vperps .* sin(gyroangle)
+  R = bfieldvrotationmatrix(bvector)
+  vx = vpara .* R[0, 0] .+ vperp1 .* R[0, 1] .+ vperp2 .* R[0, 2]
+  vy = vpara .* R[1, 0] .+ vperp1 .* R[1, 1] .+ vperp2 .* R[1, 2]
+  vz = vpara .* R[2, 0] .+ vperp1 .* R[2, 1] .+ vperp2 .* R[2, 2]
+  return (vx, vy, vz)
+end
+
+function momentumtovelocity!(pvx, pvy, pvz, mass)
+  # now convert to velocity
+  @threads for i in eachindex(pvx, pvy, pvz)
+    γ = sqrt(1 + (pvx[i]^2 + pvy[i]^2 + pvz[i]^2) / mass^2)
+    pvx[i] /= (mass * γ)
+    pvy[i] /= (mass * γ)
+    pvz[i] /= (mass * γ)
+    all(pvx[i]^2 + pvy[i]^2 + pvz[i]^2 <= 1)
+  end
+  return (pvx, pvy, pvz)
+end
+
+function thermalinitialiser(P, vth, mass, _...)
   pvx = erfinv.(2sample(P, 5, 0.0) .- 1);
   pvy = erfinv.(2sample(P, 7, 0.0) .- 1);
   pvz = erfinv.(2sample(P, 9, 0.0) .- 1);
@@ -71,16 +131,18 @@ function Species(P, vth, density, shape::AbstractShape; Lx, Ly, charge=1, mass=1
   pvx .*= mass * (vth / sqrt(2)) / std(pvx);
   pvy .*= mass * (vth / sqrt(2)) / std(pvy);
   pvz .*= mass * (vth / sqrt(2)) / std(pvz);
-  # now convert to velocity
-  @threads for i in 1:P
-    γ = sqrt(1 + (pvx[i]^2 + pvy[i]^2 + pvz[i]^2) / mass^2)
-    pvx[i] /= (mass * γ)
-    pvy[i] /= (mass * γ)
-    pvz[i] /= (mass * γ)
-    all(pvx[i]^2 + pvy[i]^2 + pvz[i]^2 <= 1)
-  end
+  momentumtovelocity!(pvx, pvy, pvz, mass)
+end
+
+function Species(P, vth, density, shape::AbstractShape,
+    velocityinitialiser::F=(mass)->thermalinitialiser(P, vth, mass);
+    Lx, Ly, charge=1, mass=1, bfield=[0, 0, 1]) where F
+  x  = Lx * sample(P, 2, 0.0);
+  y  = Ly * sample(P, 3, 0.0);
+  # us pvi to first mean momentum and then velocity, to save RAM
+  vx, vy, vz = velocityinitialiser(mass)
   p = collect(1:P)
-  xyv = Matrix(hcat(x, y, pvx, pvy, pvz)')
+  xyv = Matrix(hcat(x, y, vx, vy, vz)')
   chunks = collect(Iterators.partition(1:P, ceil(Int, P/nthreads())))
   weight = calculateweight(density, P, Lx, Ly)
   return Species(Float64(charge), Float64(mass), weight, shape, xyv, p, chunks, deepcopy(xyv))
