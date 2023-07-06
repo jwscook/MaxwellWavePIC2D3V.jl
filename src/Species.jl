@@ -86,8 +86,9 @@ function ringbeaminitialiser(P, vth, mass, vdrift, bvector, pitch)
   vperps = zeros(P)
   vperp_min = max(0.0, vdriftperp - 6.0 * vth)
   vperp_peak = (drift_perp + sqrt(vdriftperp^2 + 2vth^2)) / 2;
+  # v exp(-(v-u)^2/vth^2)
   if thermal_velocity > 0
-    for in in 1:P
+    for i in 1:P
       while true
         vperp = vperp_min + rand() * 2.0 * 6.0 * vth
         vf_eval = vperp / vperp_peak * exp(-((vperp - vdriftperp)^2 / vth^2));
