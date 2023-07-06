@@ -176,13 +176,7 @@ end
 
 
 function warmup!(field::LorenzGaugeSemiImplicitField, plasma, to)
-  @timeit to "Warmup" begin
-    dt = timestep(field)
-    warmup!(field.ρ⁻, field.Jx⁻, field.Jy⁻, field.Jz⁻, field.Js⁻, plasma, field.gridparams, -dt, to)
-    warmup!(field.ρ⁰, field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰, plasma, field.gridparams, dt, to)
-    warmup!(field.ρ⁺, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.Js⁺, plasma, field.gridparams, dt, to)
-    advect!(plasma, field.gridparams, -dt, to) # advect back to start
-  end
+    return nothing
 end
 
 
