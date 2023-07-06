@@ -235,7 +235,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   plot!(ts, (fieldmom .+ particlemom) ./ p0, label="Total")
   savefig("Momenta.png")
 
-  wind = findlast(ws .< max(cutoff, 10000 * sqrt(n0)/w0));
+  wind = findlast(ws .< cutoff)
   isnothing(wind) && (wind = length(ws)÷2)
   wind = max(wind, length(ws)÷2)
 
