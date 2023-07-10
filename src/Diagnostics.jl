@@ -240,7 +240,6 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   characteristicmom = cat(d.characteristicmomentum..., dims=2)'
   p0 = characteristicmom[1]
   plot(ts, fieldmom ./ p0, label="Fields")
-  plot!(ts, characteristicmom ./ p0, label="Characteristic")
   plot!(ts, particlemom ./ p0, label="Particles")
   plot!(ts, (fieldmom .+ particlemom) ./ p0, label="Total")
   savefig("Momenta.png")
