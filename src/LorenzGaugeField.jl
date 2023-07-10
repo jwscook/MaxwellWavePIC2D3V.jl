@@ -105,6 +105,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     lorenzgauge!(field.imex, field.Ax⁺, field.Ax⁰, field.Jx⁰, field.ffthelper.k², dt^2)
     lorenzgauge!(field.imex, field.Ay⁺, field.Ay⁰, field.Jy⁰, field.ffthelper.k², dt^2)
     lorenzgauge!(field.imex, field.Az⁺, field.Az⁰, field.Jz⁰, field.ffthelper.k², dt^2)
+    field.ϕ⁺[1, 1] = field.Ax⁺[1,1] = field.Ay⁺[1,1] = field.Az⁺[1,1] = 0 # just in case
   end
 
   # at this point (ϕ, Ai) stores the (n+1)th timestep value and (ϕ⁻, Ai⁻) the nth

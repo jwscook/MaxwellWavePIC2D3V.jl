@@ -67,7 +67,7 @@ function pic()
   Ly = Lx * NY / NX
   dt = Lx / NX / 2
   P = NX * NY * 8
-  NT = 2^10
+  NT = 2^12
   Δx = Lx / NX
   Δx = Lx / NX
   Δy = Ly / NY
@@ -75,15 +75,15 @@ function pic()
   ntskip = 16
   ngskip = 4
   @show NT ÷ ntskip
-  #field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
-  #  imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
-  field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+  field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
+  #field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+  #  imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
   #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0x=B0,
   #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
   #  buffer=10, rtol=sqrt(eps()), maxiters=1000)
   diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
-  shape = MaxwellWavePIC2D3V.BSplineWeighting{@stat 1}()
+  shape = MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}()
   electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shape;
     Lx=Lx, Ly=Ly, charge=-1, mass=Me)
   ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0 * (1 - 1/1000), shape,
@@ -107,9 +107,6 @@ function pic()
     #t % 2^12 == 0 && ThreadsX.map(s->sort!(s, Lx / NX, Ly / NY), plasma)
   end
 
-
-
-
   show(to)
 
   return diagnostics, field, plasma, n0, Va, Ωi, NT, B0
@@ -123,6 +120,6 @@ MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegachar
 
 const filecontents = [i for i in readlines(open(@__FILE__))]
 
-@save "$(hash(filecontents)" filecontents diagnostics field plasma n0 vcharacteristic omegacharacteristic NT B0
+@save "$(hash(filecontents))" filecontents diagnostics field plasma n0 vcharacteristic omegacharacteristic NT B0
 
 

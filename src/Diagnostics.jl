@@ -223,7 +223,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   ts = collect(1:ndiags) .* ((NT * dt / ndiags) / (2pi/w0))
 
   filter = sin.((collect(1:ndiags) .- 0.5) ./ ndiags .* pi)'
-  ws = 2π / (NT * dt) .* (1:ndiags) ./ (w0);
+  ws = 2π / (NT * dt) .* (1:ndiags) ./ w0;
 
   kxs = 2π/Lx .* collect(0:NXd-1) .* (vc / w0);
   kys = 2π/Ly .* collect(0:NYd-1) .* (vc / w0);
@@ -245,10 +245,11 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   plot!(ts, (fieldmom .+ particlemom) ./ p0, label="Total")
   savefig("Momenta.png")
 
-  @show ws[end], cutoff
+
   wind = findlast(ws .< cutoff)
   isnothing(wind) && (wind = length(ws)÷2)
-  wind = max(wind, length(ws)÷2)
+  wind = min(wind, length(ws)÷2)
+  @show (ws[1:2], ws[end], cutoff, wind, ws[wind])
 
   kxind = min(length(kxs)÷2-1, 128)
   kyind = min(length(kys)÷2-1, 128)
@@ -284,6 +285,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
       ylabel!(L"Position y $[V_{A} / \Omega_{i}]$");
       savefig("PIC2D3V_$(FS)_XY_t_end.png")
     catch e
+      @info "XY_t_end failed for $FS"
       @info e
     end
 
@@ -292,8 +294,9 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
       heatmap(kxs[2:kxind], ws[1:wind], Z)
       xlabel!(L"Wavenumber x $[\Omega_{i} / V_{A}]$");
       ylabel!(L"Frequency $[\Omega_{i}]$")
-      savefig("PIC2D3V_$(FS)_WKky0.png")
+      savefig("PIC2D3V_$(FS)_WKx.png")
     catch e
+      @info "WKx failed for $FS"
       @info e
     end
     try
@@ -301,8 +304,9 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
       heatmap(kys[2:kyind], ws[1:wind], Z)
       xlabel!(L"Wavenumber y $[\Omega_{i} / V_{A}]$");
       ylabel!(L"Frequency $[\Omega_{i}]$")
-      savefig("PIC2D3V_$(FS)_WKkx0.png")
+      savefig("PIC2D3V_$(FS)_WKy.png")
     catch e
+      @info "WKy failed for $FS"
       @info e
     end
   end
