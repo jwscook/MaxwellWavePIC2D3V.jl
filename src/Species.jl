@@ -23,8 +23,10 @@ function copyto!(dest::Species, src::Species)
   return dest
 end
 
+nmacroparticles(s::Species) = length(s.p)
 thermalvelocity(s::Species) = std(velocities(s))
 kineticenergy(s::Species) = sum(abs2, velocities(s)) * s.mass / 2 * s.weight
+kineticenergydensity(s::Species, volume) = kineticenergy(s) / volume
 cyclotronfrequency(s::Species, B0) = s.charge * B0 / s.mass
 numberdensity(s::Species, volume) = (s.weight / volume * length(s.p))
 function plasmafrequency(s::Species, volume)
@@ -40,7 +42,12 @@ function momentum(s::Species, op::F=identity) where F
   output .*= s.mass * s.weight
   return output
 end
-characteristicmomentum(s::Species) = momentum(s, abs)
+momentumdensity(s::Species, volume) = momentum(s) / volume
+function currentdensity(s::Species, volume)
+  return momentumdensity(s, volume) / s.mass * s.charge
+end
+
+characteristicmomentumdensity(s::Species, volume) = momentum(s, abs) / volume
 
 calculateweight(n0, P, Lx, Ly) = n0 * Lx * Ly / P;
 
@@ -59,28 +66,29 @@ end
 sample(P, _, _) = rand(P)
 
 function bfieldvrotationmatrix(bvector)
+  zvec = [0, 0, 1]
   B0 = norm(bvector)
-  bpitch = B0 == 0 ? 1.0 : bvector[3] / B0
-  iszero(B0) && (B0 = 1.0)
+  iszero(B0) && (bvector .= zvec)
+  normvector = bvector ./ norm(bvector)
+  θ = acos(dot(normvector, zvec))
+  ux, uy, uz = cross(zvec, normvector)
 
-  sinacosbpitch = sin(acos(bpitch))
-  cx = -bvector[2] / B0
-  cy = bvector[1] / B0
-
-  r00 = cx * cx * (1 - bpitch) + bpitch
-  r01 = cx * cy * (1 - bpitch)
-  r02 = cy * sinacosbpitch
-  r10 = r01
-  r11 = cy * cy * (1 - bpitch) + bpitch
-  r12 = -cx * sinacosbpitch
-  r20 = -r02
-  r21 = -r12
-  r22 = bpitch
-  return [r00 r01 r02; r10 r11 r12; r20 r21 r22]
+  r00 = cos(θ) + ux^2 * (1 - cos(θ))
+  r01 = ux * uy * (1 - cos(θ)) - uz * sin(θ)
+  r02 = ux * uz * (1 - cos(θ)) + uy * sin(θ)
+  r10 = uy * ux * (1 - cos(θ)) + uz * sin(θ)
+  r11 = cos(θ) + uy^2 * (1 - cos(θ))
+  r12 = uy * uz * (1 - cos(θ)) - ux * sin(θ)
+  r20 = uz * ux * (1 - cos(θ)) - uy * sin(θ)
+  r21 = uz * uy * (1 - cos(θ)) + ux * sin(θ)
+  r22 = cos(θ) + uz^2 * (1 - cos(θ))
+  R = [r00 r01 r02; r10 r11 r12; r20 r21 r22]
+  return R
 end
 
 function ringbeaminitialiser(P, vth, mass, v0, bvector, pitch)
   rvparas = erfinv.(2sample(P, 5, 0.0) .- 1);
+  rvparas .-= mean(rvparas)
   vpara = vth .* rvparas .+ v0 * pitch;
   vdriftperp = v0 * sqrt(1 - pitch^2);
   vperps = zeros(P)
@@ -100,13 +108,13 @@ function ringbeaminitialiser(P, vth, mass, v0, bvector, pitch)
       end
     end
   end
-  gyroangle = 2π .* sample(P, 8, 0.0)
+  gyroangle = (1/P/2:1/P:1-1/P/2) .* 2π
   vperp1 = vperps .* cos.(gyroangle)
   vperp2 = vperps .* sin.(gyroangle)
   R = bfieldvrotationmatrix(bvector)
-  vx = vpara .* R[1, 1] .+ vperp1 .* R[1, 2] .+ vperp2 .* R[1, 3]
-  vy = vpara .* R[2, 1] .+ vperp1 .* R[2, 2] .+ vperp2 .* R[2, 3]
-  vz = vpara .* R[3, 1] .+ vperp1 .* R[3, 2] .+ vperp2 .* R[3, 3]
+  vx = vperp1 .* R[1, 1] .+ vperp2 .* R[1, 2] .+ vpara .* R[1, 3]
+  vy = vperp1 .* R[2, 1] .+ vperp2 .* R[2, 2] .+ vpara .* R[2, 3]
+  vz = vperp1 .* R[3, 1] .+ vperp2 .* R[3, 2] .+ vpara .* R[3, 3]
   return (vx, vy, vz)
 end
 
@@ -132,14 +140,17 @@ function thermalinitialiser(P, vth, mass, _...)
   pvx .*= mass * (vth / sqrt(2)) / std(pvx);
   pvy .*= mass * (vth / sqrt(2)) / std(pvy);
   pvz .*= mass * (vth / sqrt(2)) / std(pvz);
+  pvx .-= mean(pvx)
+  pvy .-= mean(pvy)
+  pvz .-= mean(pvz)
   momentumtovelocity!(pvx, pvy, pvz, mass)
 end
 
 function Species(P, vth, density, shape::AbstractShape;
     Lx, Ly, charge, mass, bfield=[0, 0, 1],
     velocityinitialiser::F=()->thermalinitialiser(P, vth, mass)) where F
-  x  = Lx * sample(P, 2, 0.0);
-  y  = Ly * sample(P, 3, 0.0);
+  x = Lx * sample(P, 2, 0.0);
+  y = Ly * sample(P, 3, 0.0);
   # us pvi to first mean momentum and then velocity, to save RAM
   vx, vy, vz = velocityinitialiser()
   p = collect(1:P)

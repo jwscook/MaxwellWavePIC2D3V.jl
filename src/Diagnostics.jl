@@ -1,10 +1,10 @@
 abstract type AbstractDiagnostics end
 
 struct ElectrostaticDiagnostics <: AbstractDiagnostics
-  kineticenergy::Vector{Float64}
-  fieldenergy::Vector{Float64}
-  particlemomentum::Vector{Vector{Float64}}
-  characteristicmomentum::Vector{Vector{Float64}}
+  kineticenergydensity::Vector{Float64}
+  fieldenergydensity::Vector{Float64}
+  particlemomentumdensity::Vector{Vector{Float64}}
+  characteristicmomentumdensity::Vector{Vector{Float64}}
   Exs::Array{Float64, 3}
   Eys::Array{Float64, 3}
   ϕs::Array{Float64, 3}
@@ -12,8 +12,8 @@ struct ElectrostaticDiagnostics <: AbstractDiagnostics
   ngskip::Int
   ti::Ref{Int64}
   makegifs::Bool
-  totalenergy::Ref{Float64}
-  totalmomentum::Vector{Float64}
+  totalenergydensity::Ref{Float64}
+  totalmomentumdensity::Vector{Float64}
 end
 
 function generatestorage(NX, NY, ND, nscalar, nmomentum, nstorage)
@@ -33,11 +33,11 @@ function ElectrostaticDiagnostics(NX, NY, NT, ntskip, ngskip=1; makegifs=false)
 end
 
 struct LorenzGaugeDiagnostics <: AbstractDiagnostics
-  kineticenergy::Array{Float64, 1}
-  fieldenergy::Array{Float64, 1}
-  particlemomentum::Vector{Vector{Float64}}
-  fieldmomentum::Vector{Vector{Float64}}
-  characteristicmomentum::Vector{Vector{Float64}}
+  kineticenergydensity::Array{Float64, 1}
+  fieldenergydensity::Array{Float64, 1}
+  particlemomentumdensity::Vector{Vector{Float64}}
+  fieldmomentumdensity::Vector{Vector{Float64}}
+  characteristicmomentumdensity::Vector{Vector{Float64}}
   Exs::Array{Float64, 3}
   Eys::Array{Float64, 3}
   Ezs::Array{Float64, 3}
@@ -56,8 +56,8 @@ struct LorenzGaugeDiagnostics <: AbstractDiagnostics
   ngskip::Int
   ti::Ref{Int64}
   makegifs::Bool
-  totalenergy::Ref{Float64}
-  totalmomentum::Vector{Float64}
+  totalenergydensity::Ref{Float64}
+  totalmomentumdensity::Vector{Float64}
 end
 
 function LorenzGaugeDiagnostics(NX, NY, NT::Int, ntskip::Int, ngskip=1;
@@ -72,12 +72,12 @@ end
 
 
 
-function diagnose!(d::AbstractDiagnostics, plasma, to)
+function diagnose!(d::AbstractDiagnostics, plasma, volume, to)
   @timeit to "Plasma" begin
     ti = d.ti[]
-    d.kineticenergy[ti] = sum(kineticenergy(s) for s in plasma)
-    d.particlemomentum[ti] .= sum(momentum(s) for s in plasma)
-    d.characteristicmomentum[ti] .= sum(characteristicmomentum(s) for s in plasma)
+    d.kineticenergydensity[ti] = sum(kineticenergydensity(s, volume) for s in plasma)
+    d.particlemomentumdensity[ti] .= sum(momentumdensity(s, volume) for s in plasma)
+    d.characteristicmomentumdensity[ti] .= sum(characteristicmomentumdensity(s, volume) for s in plasma)
   end
 end
 
@@ -86,12 +86,13 @@ function diagnose!(d::ElectrostaticDiagnostics, f::ElectrostaticField, plasma,
   @timeit to "Diagnostics" begin
     t % d.ntskip == 0 && (d.ti[] += 1)
     if t % d.ntskip == 0
-      diagnose!(d, plasma, to)
+      volume = f.gridparams.Lx * f.gridparams.Ly
+      diagnose!(d, plasma, volume, to)
     end
     @timeit to "Fields" begin
       ti = d.ti[]
       if t % d.ntskip == 0
-        d.fieldenergy[ti] = mean(abs2, f.Exy) / 2
+        d.fieldenergydensity[ti] = mean(abs2, f.Exy) / 2
       end
       a = 1:d.ngskip:size(f.Ex, 1)
       b = 1:d.ngskip:size(f.Ex, 2)
@@ -133,13 +134,14 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
   @timeit to "Diagnostics" begin
     t % d.ntskip == 0 && (d.ti[] += 1)
     if t % d.ntskip == 0
-      diagnose!(d, plasma, to)
+      volume = f.gridparams.Lx * f.gridparams.Ly
+      diagnose!(d, plasma, volume, to)
     end
     @timeit to "Fields" begin
       ti = d.ti[]
       if t % d.ntskip == 0
         @timeit to "Energy" begin
-          d.fieldenergy[ti] = mean(abs2, f.EBxyz) / 2
+          d.fieldenergydensity[ti] = mean(abs2, f.EBxyz) / 2
         end
         @timeit to "Momentum" begin
           px, py, pz = 0.0, 0.0, 0.0
@@ -154,12 +156,12 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
             pz += real(f.Ex[i]) * real(f.By[i] .+ f.B0[2])
                 - real(f.Ey[i]) * real(f.Bx[i] .+ f.B0[1])
           end
-          d.fieldmomentum[ti] .= (px, py, pz) ./ length(f.Ex)
+          d.fieldmomentumdensity[ti] .= (px, py, pz) ./ length(f.Ex)
         end
-        totenergy = (d.fieldenergy[ti] + d.kineticenergy[ti]) / (d.fieldenergy[1] + d.kineticenergy[1])
-        totmomentum = (d.fieldmomentum[ti] + d.particlemomentum[ti]) ./ mean(d.characteristicmomentum[1])
-        d.totalenergy[] = totenergy
-        d.totalmomentum .= totmomentum
+        totenergydensity = (d.fieldenergydensity[ti] + d.kineticenergydensity[ti]) / (d.fieldenergydensity[1] + d.kineticenergydensity[1])
+        totmomentumdensity = (d.fieldmomentumdensity[ti] + d.particlemomentumdensity[ti]) ./ mean(d.characteristicmomentumdensity[1])
+        d.totalenergydensity[] = totenergydensity
+        d.totalmomentumdensity .= totmomentumdensity
       end
       @timeit to "Prepare fields (i)fft!" begin
         preparefieldsft!(f)
@@ -223,21 +225,24 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   ts = collect(1:ndiags) .* ((NT * dt / ndiags) / (2pi/w0))
 
   filter = sin.((collect(1:ndiags) .- 0.5) ./ ndiags .* pi)'
-  ws = 2π / (NT * dt) .* (1:ndiags) ./ w0;
+  ws = collect(2π / (NT * dt) .* (1:ndiags))
+  @show ws[1]
+  @. ws /= w0
+  @show ws[1]
 
   kxs = 2π/Lx .* collect(0:NXd-1) .* (vc / w0);
   kys = 2π/Ly .* collect(0:NYd-1) .* (vc / w0);
 
-  energy0 = d.fieldenergy[1] + d.kineticenergy[1]
+  energydensity0 = d.fieldenergydensity[1] + d.kineticenergydensity[1]
 
-  plot(ts, d.fieldenergy ./ energy0, label="Fields")
-  plot!(ts, d.kineticenergy ./ energy0, label="Particles")
-  plot!(ts, (d.fieldenergy + d.kineticenergy) ./ energy0, label="Total")
+  plot(ts, d.fieldenergydensity ./ energydensity0, label="Fields")
+  plot!(ts, d.kineticenergydensity ./ energydensity0, label="Particles")
+  plot!(ts, (d.fieldenergydensity + d.kineticenergydensity) ./ energydensity0, label="Total")
   savefig("Energies.png")
 
-  fieldmom = cat(d.fieldmomentum..., dims=2)'
-  particlemom = cat(d.particlemomentum..., dims=2)'
-  characteristicmom = cat(d.characteristicmomentum..., dims=2)'
+  fieldmom = cat(d.fieldmomentumdensity..., dims=2)'
+  particlemom = cat(d.particlemomentumdensity..., dims=2)'
+  characteristicmom = cat(d.characteristicmomentumdensity..., dims=2)'
   p0 = characteristicmom[1]
   plot(ts, fieldmom ./ p0, label="Fields")
   plot!(ts, particlemom ./ p0, label="Particles")

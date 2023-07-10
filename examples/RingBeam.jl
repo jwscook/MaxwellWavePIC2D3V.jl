@@ -1,5 +1,5 @@
 using ProgressMeter, TimerOutputs, Plots, FFTW, Random, StaticNumbers
-using ThreadPinning, JLD2
+using ThreadPinning, JLD2, Statistics
 
 @static if Base.Sys.islinux()
   pinthreads(:cores)
@@ -67,7 +67,7 @@ function pic()
   Ly = Lx * NY / NX
   dt = Lx / NX / 2
   P = NX * NY * 8
-  NT = 2^12
+  NT = 2^13
   Δx = Lx / NX
   Δx = Lx / NX
   Δy = Ly / NY
@@ -91,6 +91,11 @@ function pic()
   beam = MaxwellWavePIC2D3V.Species(P, Va, n0 / 1000, shape;
     Lx=Lx, Ly=Ly, charge=1, mass=Mi,
     velocityinitialiser=()->MaxwellWavePIC2D3V.ringbeaminitialiser(P, Va / 100, Mi, Va, [0, B0, 0], 0.5));
+
+  jbeamy = MaxwellWavePIC2D3V.currentdensity(beam, Lx * Ly)[2]
+  velectrony = - jbeamy / MaxwellWavePIC2D3V.numberdensity(electrons, Lx * Ly)
+  MaxwellWavePIC2D3V.velocities(electrons)[2, :] .-= velectrony
+
   sort!(electrons, Lx / NX, Ly / NY)
   sort!(ions, Lx / NX, Ly / NY)
   sort!(beam, Lx / NX, Ly / NY)
@@ -102,8 +107,8 @@ function pic()
     MaxwellWavePIC2D3V.loop!(plasma, field, to, t)
     MaxwellWavePIC2D3V.diagnose!(diagnostics, field, plasma, t, to)
     ProgressMeter.next!(progress;
-      showvalues=[(:t,t), (:energy, diagnostics.totalenergy),
-                  (:momentum, diagnostics.totalmomentum)])
+      showvalues=[(:t,t), (:energy, diagnostics.totalenergydensity),
+                  (:momentum, diagnostics.totalmomentumdensity)])
     #t % 2^12 == 0 && ThreadsX.map(s->sort!(s, Lx / NX, Ly / NY), plasma)
   end
 

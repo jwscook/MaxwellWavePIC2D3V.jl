@@ -121,8 +121,8 @@ function pic()
     MaxwellWavePIC2D3V.loop!(plasma, field, to, t)
     MaxwellWavePIC2D3V.diagnose!(diagnostics, field, plasma, t, to)
     ProgressMeter.next!(progress;
-      showvalues=[(:t,t), (:energy, diagnostics.totalenergy),
-                  (:momentum, diagnostics.totalmomentum)])
+      showvalues=[(:t,t), (:energy, diagnostics.totalenergydensity),
+                  (:momentum, diagnostics.totalmomentumdensity)])
     #t % 2^12 == 0 && ThreadsX.map(s->sort!(s, Lx / NX, Ly / NY), plasma)
   end
 
