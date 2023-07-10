@@ -69,6 +69,9 @@ function loop!(plasma, field::EJField, to, t)
     field.ffthelper.pfft! * field.Jx⁺;
     field.ffthelper.pfft! * field.Jy⁺;
     field.ffthelper.pfft! * field.Jz⁺;
+    field.ffthelper.pfft! * field.Bx
+    field.ffthelper.pfft! * field.By
+    field.ffthelper.pfft! * field.Bz
   end
 
   # ∂²E/∂t² = - ∂J/∂t - ∇ × (∇ × E)
@@ -86,15 +89,18 @@ function loop!(plasma, field::EJField, to, t)
     @. f.Ex=(2f.Ex⁰-f.Ex⁻-dt^2*((f.Jx⁺-f.Jx⁰)/dt+im*f.ffthelper.kx*(f.ρ⁺+f.ρ⁰)/2+f.ffthelper.k²*((1-θ)*f.Ex⁰+θ/2*f.Ex⁻)))/(1+dt^2*θ/2*f.ffthelper.k²)
     @. f.Ey=(2f.Ey⁰-f.Ey⁻-dt^2*((f.Jy⁺-f.Jy⁰)/dt+im*f.ffthelper.ky*(f.ρ⁺+f.ρ⁰)/2+f.ffthelper.k²*((1-θ)*f.Ey⁰+θ/2*f.Ey⁻)))/(1+dt^2*θ/2*f.ffthelper.k²)
     @. f.Ez=(2f.Ez⁰-f.Ez⁻-dt^2*((f.Jz⁺-f.Jz⁰)/dt+0                              +f.ffthelper.k²*((1-θ)*f.Ez⁰+θ/2*f.Ez⁻)))/(1+dt^2*θ/2*f.ffthelper.k²)
+    f.Ex[1,1] = f.Ey[1,1] = f.Ez[1,1] = 0
+
     @. f.ϕ⁰ = f.ρ⁺ / f.ffthelper.k² # ρ⁰
     f.ϕ⁰[1,1] = 0
     @. f.Ax⁺ = f.Ax⁰ - dt * (f.Ex + f.Ex⁰)/2 - im * f.ffthelper.kx * f.ϕ⁰
     @. f.Ay⁺ = f.Ay⁰ - dt * (f.Ey + f.Ey⁰)/2 - im * f.ffthelper.ky * f.ϕ⁰
-    @. f.Az⁺ = f.Az⁰ - dt * (f.Ez + f.Ez⁰)/2
-    @. f.Bx =  im * f.ffthelper.ky * f.Az⁺
-    @. f.By = -im * f.ffthelper.kx * f.Az⁺
+#    @. f.Az⁺ = f.Az⁰ - dt * (f.Ez + f.Ez⁰)/2
+    f.Ax⁺[1,1] = f.Ay⁺[1,1] = f.Az⁺[1,1] = 0
     @. f.Bz =  im * f.ffthelper.kx * f.Ay⁺
     @. f.Bz -= im * f.ffthelper.ky * f.Ax⁺
+    @. f.Bx = f.Bx - dt * im * f.ffthelper.ky * f.Ez
+    @. f.By = f.By + dt * im * f.ffthelper.kx * f.Ez
   end
 
   @timeit to "Field Inverse FT" begin
