@@ -13,7 +13,7 @@ struct ElectrostaticDiagnostics <: AbstractDiagnostics
   ti::Ref{Int64}
   makegifs::Bool
   totalenergydensity::Ref{Float64}
-  totalmomentumdensity::Vector{Float64}
+  totalmomentumdensitychange::Vector{Float64}
 end
 
 function generatestorage(NX, NY, ND, nscalar, nmomentum, nstorage)
@@ -57,7 +57,7 @@ struct LorenzGaugeDiagnostics <: AbstractDiagnostics
   ti::Ref{Int64}
   makegifs::Bool
   totalenergydensity::Ref{Float64}
-  totalmomentumdensity::Vector{Float64}
+  totalmomentumdensitychange::Vector{Float64}
 end
 
 function LorenzGaugeDiagnostics(NX, NY, NT::Int, ntskip::Int, ngskip=1;
@@ -159,9 +159,12 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
           d.fieldmomentumdensity[ti] .= (px, py, pz) ./ length(f.Ex)
         end
         totenergydensity = (d.fieldenergydensity[ti] + d.kineticenergydensity[ti]) / (d.fieldenergydensity[1] + d.kineticenergydensity[1])
-        totmomentumdensity = (d.fieldmomentumdensity[ti] + d.particlemomentumdensity[ti]) ./ mean(d.characteristicmomentumdensity[1])
+        instanteousmomentumdensity = d.fieldmomentumdensity[ti] + d.particlemomentumdensity[ti]
+        momentumdensitychange = instanteousmomentumdensity
+        momentumdensitychange -= d.fieldmomentumdensity[1]
+        momentumdensitychange -= d.particlemomentumdensity[1]
         d.totalenergydensity[] = totenergydensity
-        d.totalmomentumdensity .= totmomentumdensity
+        d.totalmomentumdensitychange .= momentumdensitychange #./ d.characteristicmomentumdensity[1]
       end
       @timeit to "Prepare fields (i)fft!" begin
         preparefieldsft!(f)
