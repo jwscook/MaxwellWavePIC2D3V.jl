@@ -1,4 +1,15 @@
 unimod(x, n) = x > n ? x - n : x > 0 ? x : x + n
+#unimod(x, n) = mod1(x, n)
+#function unimod(x, n)
+#  (1 <= x <= n) && return x
+#  while x > n
+#    x = x - n
+#  end
+#  while x <= 0
+#    x = x+ n
+#  end
+#  x
+#end
 
 function applyperiodicity!(a::Array, oa)
   NX, NY = size(a)
@@ -45,6 +56,18 @@ function reduction!(a, b, c, z)
   end
 end
 
+function reduction!(args...)
+  z = args[end]
+  @assert size(z, 1) == length(args) - 1
+  for (h, a) in enumerate(args[1:end-1])
+    a .= 0.0
+    @views for k in axes(z, 4)
+      applyperiodicity!(a, z[h, :, :, k])
+    end
+  end
+end
+
+
 warmup!(field::AbstractField, plasma, to) = field
 
 function advect!(plasma, gridparams, dt, to)
@@ -87,8 +110,10 @@ function printresolutions(plasma, field, dt, NT, to)
   println("    ΔY ", ΔY)
   println("    B0 ", B0)
   println("    Va / c ", Va)
-  println("    c dt / dl ", dt / Δl)
-  println("    dl / (c dt) ", Δl / dt)
+  println("    c dt / ΔX ", dt / ΔX)
+  println("    ΔX / (c dt) ", ΔX / dt)
+  println("    c dt / ΔY ", dt / ΔY)
+  println("    ΔY / (c dt) ", ΔY / dt)
   for (s, species) in enumerate(plasma)
     println("  Species $s with mass $(species.mass) and charge $(species.charge) and numberdensity $(nm):")
     Ω = cyclotronfrequency(species, B0)
@@ -97,6 +122,7 @@ function printresolutions(plasma, field, dt, NT, to)
     λ_D = vth / Π
     r_L = vth / Ω
     println("    vth / c ", vth)
+    println("    vth / Va ", vth / Va)
     println("    c / vth ", 1 / vth)
     println("    vth dt / Δl ", vth * dt / Δl)
     println("    Δl / (vth dt) ", 1/(vth * dt / Δl))

@@ -35,10 +35,11 @@ include("GridParameters.jl")
 include("FFTHelper.jl")
 
 
-@inline function (f::AbstractLorenzGaugeField)(s::AbstractShape, xi, yi)
+@inline function (f::AbstractLorenzGaugeField)(s::AbstractShape, xi::T, yi::T) where T
   NX, NY = f.gridparams.NX, f.gridparams.NY
   NX_Lx, NY_Ly = f.gridparams.NX_Lx, f.gridparams.NY_Ly
-  output = MVector{6, real(eltype(f.EBxyz))}(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+  U = promote_type(T, real(eltype(f.EBxyz)))
+  output = MVector{6, U}(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
   for (j, wy) in depositindicesfractions(s, yi, NY, NY_Ly)
     for (i, wx) in depositindicesfractions(s, xi, NX, NX_Lx)
       wxy = wx * wy

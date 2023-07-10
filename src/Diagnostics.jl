@@ -104,6 +104,30 @@ function diagnose!(d::ElectrostaticDiagnostics, f::ElectrostaticField, plasma,
   end
 end
 
+function preparefieldsft!(f::AbstractLorenzGaugeField)
+  f.ffthelper.pifft! * f.Ax⁰
+  f.ffthelper.pifft! * f.Ay⁰
+  f.ffthelper.pifft! * f.Az⁰
+  f.ffthelper.pifft! * f.ϕ⁰
+  #f.ffthelper.pifft! * f.ρ⁰
+  #f.ffthelper.pifft! * f.Jx⁰
+  #f.ffthelper.pifft! * f.Jy⁰
+  #f.ffthelper.pifft! * f.Jz⁰
+end
+function restorefieldsft!(f::AbstractLorenzGaugeField)
+  f.ffthelper.pfft! * f.Ax⁰
+  f.ffthelper.pfft! * f.Ay⁰
+  f.ffthelper.pfft! * f.Az⁰
+  f.ffthelper.pfft! * f.ϕ⁰
+  #f.ffthelper.pifft! * f.ρ⁰
+  #f.ffthelper.pifft! * f.Jx⁰
+  #f.ffthelper.pifft! * f.Jy⁰
+  #f.ffthelper.pifft! * f.Jz⁰
+end
+
+
+
+
 function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasma,
     t, to)
   @timeit to "Diagnostics" begin
@@ -137,15 +161,8 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
         d.totalenergy[] = totenergy
         d.totalmomentum .= totmomentum
       end
-      @timeit to "Field ifft!" begin
-        f.ffthelper.pifft! * f.Ax⁰
-        f.ffthelper.pifft! * f.Ay⁰
-        f.ffthelper.pifft! * f.Az⁰
-        f.ffthelper.pifft! * f.ϕ⁰
-        #f.ffthelper.pifft! * f.ρ⁰ # still in real space
-        #f.ffthelper.pifft! * f.Jx⁰
-        #f.ffthelper.pifft! * f.Jy⁰
-        #f.ffthelper.pifft! * f.Jz⁰
+      @timeit to "Prepare fields (i)fft!" begin
+        preparefieldsft!(f)
       end
       @timeit to "Field averaging" begin
         function average!(lhs, rhs)
@@ -174,15 +191,8 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
         td = Threads.@spawn average!(d.Jzs, f.Jz⁰)
         wait.((t0, t1, t2, t3, t4, t5, t6,t7, t8, t9, ta, tb, tc, td))
       end
-      @timeit to "Field fft!" begin
-        f.ffthelper.pfft! * f.Ax⁰
-        f.ffthelper.pfft! * f.Ay⁰
-        f.ffthelper.pfft! * f.Az⁰
-        f.ffthelper.pfft! * f.ϕ⁰
-        #f.ffthelper.pfft! * f.ρ⁺; # still in real space! (plus, they're overwritten)
-        #f.ffthelper.pfft! * f.Jx⁺;
-        #f.ffthelper.pfft! * f.Jy⁺;
-        #f.ffthelper.pfft! * f.Jz⁺;
+      @timeit to "Restore fields (i)fft!" begin
+        restorefieldsft!(f)
       end
     end
   end
@@ -235,6 +245,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   plot!(ts, (fieldmom .+ particlemom) ./ p0, label="Total")
   savefig("Momenta.png")
 
+  @show ws[end], cutoff
   wind = findlast(ws .< cutoff)
   isnothing(wind) && (wind = length(ws)÷2)
   wind = max(wind, length(ws)÷2)

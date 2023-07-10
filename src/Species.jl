@@ -79,15 +79,15 @@ function bfieldvrotationmatrix(bvector)
   return [r00 r01 r02; r10 r11 r12; r20 r21 r22]
 end
 
-function ringbeaminitialiser(P, vth, mass, vdrift, bvector, pitch)
+function ringbeaminitialiser(P, vth, mass, v0, bvector, pitch)
   rvparas = erfinv.(2sample(P, 5, 0.0) .- 1);
-  vdriftpara = vth * rvpara + vdrift * pitch;
-  vdriftperp = vdrift * sqrt(1 - pitch^2);
+  vpara = vth .* rvparas .+ v0 * pitch;
+  vdriftperp = v0 * sqrt(1 - pitch^2);
   vperps = zeros(P)
   vperp_min = max(0.0, vdriftperp - 6.0 * vth)
-  vperp_peak = (drift_perp + sqrt(vdriftperp^2 + 2vth^2)) / 2;
+  vperp_peak = (vdriftperp + sqrt(vdriftperp^2 + 2vth^2)) / 2;
   # v exp(-(v-u)^2/vth^2)
-  if thermal_velocity > 0
+  if vth > 0
     for i in 1:P
       while true
         vperp = vperp_min + rand() * 2.0 * 6.0 * vth
@@ -101,12 +101,12 @@ function ringbeaminitialiser(P, vth, mass, vdrift, bvector, pitch)
     end
   end
   gyroangle = 2π .* sample(P, 8, 0.0)
-  vperp1 = vperps .* cos(gyroangle)
-  vperp2 = vperps .* sin(gyroangle)
+  vperp1 = vperps .* cos.(gyroangle)
+  vperp2 = vperps .* sin.(gyroangle)
   R = bfieldvrotationmatrix(bvector)
-  vx = vpara .* R[0, 0] .+ vperp1 .* R[0, 1] .+ vperp2 .* R[0, 2]
-  vy = vpara .* R[1, 0] .+ vperp1 .* R[1, 1] .+ vperp2 .* R[1, 2]
-  vz = vpara .* R[2, 0] .+ vperp1 .* R[2, 1] .+ vperp2 .* R[2, 2]
+  vx = vpara .* R[1, 1] .+ vperp1 .* R[1, 2] .+ vperp2 .* R[1, 3]
+  vy = vpara .* R[2, 1] .+ vperp1 .* R[2, 2] .+ vperp2 .* R[2, 3]
+  vz = vpara .* R[3, 1] .+ vperp1 .* R[3, 2] .+ vperp2 .* R[3, 3]
   return (vx, vy, vz)
 end
 
@@ -135,13 +135,13 @@ function thermalinitialiser(P, vth, mass, _...)
   momentumtovelocity!(pvx, pvy, pvz, mass)
 end
 
-function Species(P, vth, density, shape::AbstractShape,
-    velocityinitialiser::F=(mass)->thermalinitialiser(P, vth, mass);
-    Lx, Ly, charge=1, mass=1, bfield=[0, 0, 1]) where F
+function Species(P, vth, density, shape::AbstractShape;
+    Lx, Ly, charge, mass, bfield=[0, 0, 1],
+    velocityinitialiser::F=()->thermalinitialiser(P, vth, mass)) where F
   x  = Lx * sample(P, 2, 0.0);
   y  = Ly * sample(P, 3, 0.0);
   # us pvi to first mean momentum and then velocity, to save RAM
-  vx, vy, vz = velocityinitialiser(mass)
+  vx, vy, vz = velocityinitialiser()
   p = collect(1:P)
   xyv = Matrix(hcat(x, y, vx, vy, vz)')
   chunks = collect(Iterators.partition(1:P, ceil(Int, P/nthreads())))

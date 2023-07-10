@@ -25,13 +25,13 @@ function pic()
   Mi = 64 #2 * 1836
   Me = 1
 
-  TeeV = 1e4
   Va = B / sqrt(MU_0 * Mi * ELEMENTARY_MASS * n)
   Wp = ELEMENTARY_CHARGE * sqrt(n / Me / ELEMENTARY_MASS / EPSILON_0)
+  TeeV = 0.5 * ELEMENTARY_MASS * Me * (Va / 10)^2 / ELEMENTARY_CHARGE
   vthe = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / Me / ELEMENTARY_MASS)
   lD0 = vthe / Wp
   Ωi0 = ELEMENTARY_CHARGE * B / Mi / ELEMENTARY_MASS
-  kresolution = 1
+  kresolution = 4
   L = Va / Ωi0 * 2π * kresolution
   @show REQUIRED_GRID_CELLS = L / lD0
 
@@ -49,7 +49,7 @@ function pic()
 
   to = TimerOutput()
 
-  NQ = 4
+  NQ = 32
   NX = 2^9 * NQ #10
   NY = 2^9 ÷ NQ #10
 
@@ -65,37 +65,50 @@ function pic()
 
   Lx = L0
   Ly = Lx * NY / NX
-  dt = Lx / NX / 8
+  dt = Lx / NX / 2
   P = NX * NY * 8
-  NT = 2^14
+  NT = 2^10
   Δx = Lx / NX
   Δx = Lx / NX
   Δy = Ly / NY
-  dl = min(Lx / NX, Ly / NY)
 
   ntskip = 16
   ngskip = 4
   @show NT ÷ ntskip
-  field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+  #field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+  #  imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
+  field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
   #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0x=B0,
   #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
   #  buffer=10, rtol=sqrt(eps()), maxiters=1000)
   diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
-  shape = MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}()
+  shape = MaxwellWavePIC2D3V.BSplineWeighting{@stat 1}()
   electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shape;
     Lx=Lx, Ly=Ly, charge=-1, mass=Me)
-  ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0, shape;
+  ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0 * (1 - 1/1000), shape,
     Lx=Lx, Ly=Ly, charge=1, mass=Mi)
+  beam = MaxwellWavePIC2D3V.Species(P, Va, n0 / 1000, shape;
+    Lx=Lx, Ly=Ly, charge=1, mass=Mi,
+    velocityinitialiser=()->MaxwellWavePIC2D3V.ringbeaminitialiser(P, Va / 100, Mi, Va, [0, B0, 0], 0.5));
   sort!(electrons, Lx / NX, Ly / NY)
   sort!(ions, Lx / NX, Ly / NY)
-  plasma = [electrons, ions]
+  sort!(beam, Lx / NX, Ly / NY)
+  plasma = [electrons, ions, beam]
 
   MaxwellWavePIC2D3V.printresolutions(plasma, field, dt, NT, to)
+  progress = Progress(NT; showspeed=true)
   for t in 0:NT-1;
     MaxwellWavePIC2D3V.loop!(plasma, field, to, t)
     MaxwellWavePIC2D3V.diagnose!(diagnostics, field, plasma, t, to)
+    ProgressMeter.next!(progress;
+      showvalues=[(:t,t), (:energy, diagnostics.totalenergy),
+                  (:momentum, diagnostics.totalmomentum)])
+    #t % 2^12 == 0 && ThreadsX.map(s->sort!(s, Lx / NX, Ly / NY), plasma)
   end
+
+
+
 
   show(to)
 

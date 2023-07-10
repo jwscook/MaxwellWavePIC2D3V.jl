@@ -67,9 +67,9 @@ function pic()
   #@timeit to "Initialisation" begin
     Lx = L0
     Ly = Lx * NY / NX
-    dt = Lx / NX / 8
+    dt = Lx / NX / 2
     P = NX * NY * 8
-    NT = 2^16 #2^10#2^14
+    NT = 2^12 # 2^14
     Δx = Lx / NX
     Δx = Lx / NX
     Δy = Ly / NY
@@ -89,11 +89,13 @@ function pic()
     @show NT ÷ ntskip
     #dt = 2dl #/6vth
     #dt = dl / vth
-    field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+    #field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+    #  imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
+    field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
       imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
     #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
-    #  buffer=10, rtol=sqrt(eps()), maxiters=1000)
+    #  buffer=10, rtol=100eps(), maxiters=1000)
     diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
     shape = MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}()
     #shape = MaxwellWavePIC2D3V.NGPWeighting();#
@@ -112,7 +114,7 @@ function pic()
 #  end
 
   MaxwellWavePIC2D3V.printresolutions(plasma, field, dt, NT, to)
-  #MaxwellWavePIC2D3V.warmup!(field, plasma, to)
+  MaxwellWavePIC2D3V.warmup!(field, plasma, to)
 
   progress = Progress(NT; showspeed=true)
   for t in 0:NT-1;
@@ -121,7 +123,7 @@ function pic()
     ProgressMeter.next!(progress;
       showvalues=[(:t,t), (:energy, diagnostics.totalenergy),
                   (:momentum, diagnostics.totalmomentum)])
-    t % 2^12 == 0 && ThreadsX.map(s->sort!(s, Lx / NX, Ly / NY), plasma)
+    #t % 2^12 == 0 && ThreadsX.map(s->sort!(s, Lx / NX, Ly / NY), plasma)
   end
 
   show(to)
@@ -133,7 +135,7 @@ diagnostics, field, plasma, n0, vcharacteristic, omegacharacteristic, NT, B0 = p
 
 
 MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegacharacteristic, NT;
-                              cutoff=20 * omegacharacteristic)
+                              cutoff=10 * omegacharacteristic)
 
 const filecontents = [i for i in readlines(open(@__FILE__))]
 
