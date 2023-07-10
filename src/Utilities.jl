@@ -138,6 +138,7 @@ function printresolutions(plasma, field, dt, NT, to)
     println("    T / (2π / Ω)     = ", dt * NT / (2π/Ω))
     println("    (2π / Lx) Va / Ω = ", (2π / Lx) * Va / Ω)
     println("    (2π / Ly) Va / Ω = ", (2π / Ly) * Va / Ω)
+    println("    Characteristic momentum density = ", characteristicmomentumdensity(species, Lx * Ly))
   end
 end
 
