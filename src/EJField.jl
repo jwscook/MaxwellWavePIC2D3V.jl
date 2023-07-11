@@ -158,17 +158,17 @@ function loop!(plasma, field::EJField, to, t)
         #  x.....x.....x
         #  v.....v.....v
         @inbounds for i in species.chunks[j]
-          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shape, x[i], y[i])
+          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
           vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
           x[i] = unimod(x[i] + (vxi + vx[i]) * dt/4, Lx)
           y[i] = unimod(y[i] + (vxi + vy[i]) * dt/4, Ly)
-          deposit!(J⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
+          deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
           x[i] = unimod(x[i] + (vxi + vx[i]) * dt/4, Lx)
           y[i] = unimod(y[i] + (vxi + vy[i]) * dt/4, Ly)
-          deposit!(ρ⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
+          deposit!(ρ⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
                    qw_ΔV)
         end
       end
@@ -215,13 +215,13 @@ function updatemomentum!(f::EJField)
   wait.((t0, t1, t2))
 end
 
-@inline function (f::EJField)(s::AbstractShape, xi::T, yi::T, Axyz) where T
+@inline function (f::EJField)(shapes, xi::T, yi::T, Axyz) where T
   NX, NY = f.gridparams.NX, f.gridparams.NY
   NX_Lx, NY_Ly = f.gridparams.NX_Lx, f.gridparams.NY_Ly
   U = promote_type(T, real(eltype(Axyz)))
   output = MVector{3, U}(0.0, 0.0, 0.0)
-  for (j, wy) in depositindicesfractions(s, yi, NY, NY_Ly)
-    for (i, wx) in depositindicesfractions(s, xi, NX, NX_Lx)
+  for (j, wy) in depositindicesfractions(shapes[2], yi, NY, NY_Ly)
+    for (i, wx) in depositindicesfractions(shapes[1], xi, NX, NX_Lx)
       wxy = wx * wy
       @simd for h in 1:3
           output[h] += Axyz[h, i, j] * wxy

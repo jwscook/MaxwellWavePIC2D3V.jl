@@ -102,13 +102,13 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
           vyʷ = @view velocities(species; work=true)[2, :]
           vzʷ = @view velocities(species; work=true)[3, :]
           for i in species.chunks[j]
-            Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shape, x[i], y[i])
+            Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
             xʷ[i] = unimod(x[i] + vx[i] * dt, Lx)
             yʷ[i] = unimod(y[i] + vy[i] * dt, Ly)
             vxʷ[i], vyʷ[i], vzʷ[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
               Bxi, Byi, Bzi, q_m);
             # now deposit ρ at (n+1)th timestep
-            deposit!(ρJ⁺, species.shape, xʷ[i], yʷ[i], NX_Lx, NY_Ly,
+            deposit!(ρJ⁺, species.shapes, xʷ[i], yʷ[i], NX_Lx, NY_Ly,
               vxʷ[i] * qw_ΔV, vyʷ[i] * qw_ΔV,  vzʷ[i] * qw_ΔV)
           end
         end

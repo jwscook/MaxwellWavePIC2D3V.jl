@@ -31,7 +31,7 @@ function pic()
   vthe = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / Me / ELEMENTARY_MASS)
   lD0 = vthe / Wp
   Ωi0 = ELEMENTARY_CHARGE * B / Mi / ELEMENTARY_MASS
-  kresolution = 4
+  kresolution = 8
   L = Va / Ωi0 * 2π * kresolution
   @show REQUIRED_GRID_CELLS = L / lD0
 
@@ -49,9 +49,9 @@ function pic()
 
   to = TimerOutput()
 
-  NQ = 32
+  NQ = 128
   NX = 2^9 * NQ #10
-  NY = 2^9 ÷ NQ #10
+  NY = 1#2^9 ÷ NQ #10
 
   L0 = L / m_lengthScale
   B0 = B / (m_magneticPotentialScale / m_lengthScale)
@@ -73,7 +73,7 @@ function pic()
   Δy = Ly / NY
 
   ntskip = 16
-  ngskip = 4
+  ngskip = (4,1)
   @show NT ÷ ntskip
   field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
@@ -83,12 +83,12 @@ function pic()
   #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
   #  buffer=10, rtol=sqrt(eps()), maxiters=1000)
   diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
-  shape = MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}()
-  electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shape;
+  shapes = (MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}(), MaxwellWavePIC2D3V.BSplineWeighting{@stat 0}())
+  electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shapes;
     Lx=Lx, Ly=Ly, charge=-1, mass=Me)
-  ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0 * (1 - 1/1000), shape,
+  ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0 * (1 - 1/1000), shapes,
     Lx=Lx, Ly=Ly, charge=1, mass=Mi)
-  beam = MaxwellWavePIC2D3V.Species(P, Va, n0 / 1000, shape;
+  beam = MaxwellWavePIC2D3V.Species(P, Va, n0 / 1000, shapes;
     Lx=Lx, Ly=Ly, charge=1, mass=Mi,
     velocityinitialiser=()->MaxwellWavePIC2D3V.ringbeaminitialiser(P, Va / 100, Mi, Va, [0, B0, 0], 0.5));
 

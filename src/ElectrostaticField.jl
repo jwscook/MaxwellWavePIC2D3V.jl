@@ -51,12 +51,12 @@ function loop!(plasma, field::ElectrostaticField, to, t)
         vy = @view velocities(species)[2, :]
         vz = @view velocities(species)[3, :]
         for i in species.chunks[k]
-          Exi, Eyi = field(species.shape, x[i], y[i])
+          Exi, Eyi = field(species.shapes, x[i], y[i])
           vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, q_m);
           x[i] = unimod(x[i] + (vxi + vx[i])/2*dt, Lx)
           y[i] = unimod(y[i] + (vyi + vy[i])/2*dt, Ly)
-          deposit!(ρ, species.shape, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
+          deposit!(ρ, species.shapes, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
         end
       end
     end
@@ -88,12 +88,12 @@ function loop!(plasma, field::ElectrostaticField, to, t)
 end
 
 
-@inline function (f::ElectrostaticField)(s::AbstractShape, xi, yi)
+@inline function (f::ElectrostaticField)(shapes, xi, yi)
   NX, NY = f.gridparams.NX, f.gridparams.NY
   NX_Lx, NY_Ly = f.gridparams.NX_Lx, f.gridparams.NY_Ly
   Ex = Ey = zero(eltype(f.Exy))
-  for (j, wy) in depositindicesfractions(s, yi, NY, NY_Ly)
-    for (i, wx) in depositindicesfractions(s, xi, NX, NX_Lx)
+  for (j, wy) in depositindicesfractions(shapes[2], yi, NY, NY_Ly)
+    for (i, wx) in depositindicesfractions(shapes[1], xi, NX, NX_Lx)
       wxy = wx * wy
       @muladd Ex = Ex + f.Exy[1,i,j] * wxy
       @muladd Ey = Ey + f.Exy[2,i,j] * wxy

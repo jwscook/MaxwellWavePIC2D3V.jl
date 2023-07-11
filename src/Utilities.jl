@@ -1,5 +1,5 @@
-unimod(x, n) = x > n ? x - n : x > 0 ? x : x + n
-#unimod(x, n) = mod1(x, n)
+#unimod(x, n) = x > n ? x - n : x > 0 ? x : x + n
+unimod(x, n) = mod1(x, n)
 #function unimod(x, n)
 #  (1 <= x <= n) && return x
 #  while x > n
@@ -87,6 +87,57 @@ function advect!(plasma, gridparams, dt, to)
       end
     end
   end
+end
+
+const SPEED_OF_LIGHT = 299792458.0
+const ELEMENTARY_MASS = 9.1093837e-31;
+const ELEMENTARY_CHARGE = 1.60217663e-19;
+const MU_0 = 4.0e-7 * π;
+const EPSILON_0 = 1.0 / MU_0 / SPEED_OF_LIGHT / SPEED_OF_LIGHT;
+
+struct Scalings
+  lengthscale::Float64
+  timescale::Float64
+  electricpotentialscale::Float64
+  chargedensityscale::Float64
+  numberdensityscale::Float64
+  magneticpotentialscale::Float64
+  currentdensityscale::Float64
+end
+
+function Scalings(L)
+  lengthscale = L
+  timescale = lengthscale / SPEED_OF_LIGHT;
+  electricpotentialscale = ELEMENTARY_MASS *
+  (lengthscale / timescale)^2 / ELEMENTARY_CHARGE;
+  chargedensityscale =
+      electricpotentialscale * EPSILON_0 / lengthscale^2;
+  numberdensityscale = chargedensityscale / ELEMENTARY_CHARGE;
+  magneticpotentialscale =
+      timescale * electricpotentialscale / lengthscale;
+  currentdensityscale = chargedensityscale * lengthscale / timescale;
+  return Scaling(lengthscale, timescale, electricpotentialscale,
+                 chargedensityscale, numberdensity, magneticpotentialscale,
+                 currentdensityscale)
+end
+
+normaliselength(s::Scalings, x) = x / s.lengthscale
+normalisetime(s::Scalings, t) = t / s.timescale
+normalisespeed(s::Scalings, v) = v / (s.lengthscale / s.timescale)
+normalisenumberdensity(s::Scalings, n) = n / s.numberdensityscale
+normalisemagneticfield(s::Scalings, B) = B / (s.magneticpotentialscale / s.lengthscale)
+normaliseelectricfield(s::Scalings, E) = E / (s.electricpotentialscale / s.lengthscale)
+
+function printscaling(L)
+  scaling = Scalings(L)
+  println("Scaling information in SI:")
+  println("   Length scale             : ", scaling.lengthscale)
+  println("   Time scale               : ", scaling.timescale)
+  println("   Electric potential scale : ", scaling.electricpotentialscale)
+  println("   Charge density scale     : ", scaling.chargedensityscale)
+  println("   Number density scale     : ", scaling.numberdensityscale)
+  println("   Magnetic potential scale : ", scaling.magneticpotentialscale)
+  println("   Current density scale    : ", scaling.currentdensityscale)
 end
 
 function printresolutions(plasma, field, dt, NT, to)

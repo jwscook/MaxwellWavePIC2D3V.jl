@@ -61,8 +61,8 @@ function warmup!(field::LorenzGaugeField, plasma, to)
   #      vy = @view velocities(species)[2, :]
   #      vz = @view velocities(species)[3, :]
   #      @inbounds for i in species.chunks[j]
-  #        #deposit!(J⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
-  #        deposit!(J⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
+  #        #deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
+  #        deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
   #          vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
   #      end
   #    end
@@ -165,7 +165,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
         #  x.....x.....x
         #  v.....v.....v
         @inbounds for i in species.chunks[j]
-          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shape, x[i], y[i])
+          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
           @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
           vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
@@ -173,7 +173,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
           @assert all(isfinite, (x[i], y[i], vxi, vyi, vx[i], vy[i]))
           x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
           y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
-          deposit!(J⁰, species.shape, x[i], y[i], NX_Lx, NY_Ly,
+          deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
         end
       end
