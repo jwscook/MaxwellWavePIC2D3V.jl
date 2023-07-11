@@ -89,20 +89,20 @@ end
 end
 
 
-function deposit!(z::AbstractArray{<:Number, 2}, s::AbstractShape, x, y, NX_Lx, NY_Ly, w::Number)
+function deposit!(z::AbstractArray{<:Number, 2}, shapes, x, y, NX_Lx, NY_Ly, w::Number)
   NX, NY = size(z)
-  for (j, wy) in depositindicesfractions(s, y, NY, NY_Ly)
-    for (i, wx) in depositindicesfractions(s, x, NX, NX_Lx)
+  for (j, wy) in depositindicesfractions(shapes[2], y, NY, NY_Ly)
+    for (i, wx) in depositindicesfractions(shapes[1], x, NX, NX_Lx)
       z[i,j] += wx * wy * w
     end
   end
 end
 
-function deposit!(z::AbstractArray{<:Number, 3}, s::AbstractShape, x, y, NX_Lx, NY_Ly, w1, w2, w3)
+function deposit!(z::AbstractArray{<:Number, 3}, shapes, x, y, NX_Lx, NY_Ly, w1, w2, w3)
   NV, NX, NY = size(z)
   @assert NV == 3
-  for (j, wy) in depositindicesfractions(s, y, NY, NY_Ly)
-    for (i, wx) in depositindicesfractions(s, x, NX, NX_Lx)
+  for (j, wy) in depositindicesfractions(shapes[2], y, NY, NY_Ly)
+    for (i, wx) in depositindicesfractions(shapes[1], x, NX, NX_Lx)
       wxy = wx * wy
       @muladd z[1,i,j] = z[1,i,j] + wxy * w1
       @muladd z[2,i,j] = z[2,i,j] + wxy * w2

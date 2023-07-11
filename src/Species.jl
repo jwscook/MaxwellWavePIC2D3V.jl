@@ -1,14 +1,32 @@
 
-struct Species{S<:AbstractShape}
+struct Species{S1<:AbstractShape, S2<:AbstractShape}
+  shapes::Tuple{S1, S2}
   charge::Float64
   mass::Float64
   weight::Float64
-  shape::S
   xyv::Matrix{Float64}
   p::Vector{Int}
   chunks::Vector{UnitRange{Int}}
   xyvwork::Matrix{Float64}
 end
+
+function Species(P, vth, density, shapes::S; Lx, Ly, charge, mass,
+    bfield=[0, 0, 1], velocityinitialiser::F=()->thermalinitialiser(P, vth, mass)
+    ) where {S<:Union{AbstractShape, Tuple{<:AbstractShape, <:AbstractShape}, Vector{AbstractShape}}, F}
+  @assert 1 <= length(shapes) <= 2
+  x = Lx * sample(P, 2, 0.0);
+  y = Ly * sample(P, 3, 0.0);
+  # us pvi to first mean momentum and then velocity, to save RAM
+  vx, vy, vz = velocityinitialiser()
+  p = collect(1:P)
+  xyv = Matrix(hcat(x, y, vx, vy, vz)')
+  chunks = collect(Iterators.partition(1:P, ceil(Int, P/nthreads())))
+  weight = calculateweight(density, P, Lx, Ly)
+  shapes = length(shapes) == 1 ? (shapes, shapes) : tuple(shapes...)
+  return Species(shapes, Float64(charge), Float64(mass), weight, xyv, p, chunks, deepcopy(xyv))
+end
+
+
 function positions(s::Species; work=false)
   return work ? (@view s.xyvwork[1:2, :]) : (@view s.xyv[1:2, :])
 end
@@ -83,6 +101,7 @@ function bfieldvrotationmatrix(bvector)
   r21 = uz * uy * (1 - cos(θ)) + ux * sin(θ)
   r22 = cos(θ) + uz^2 * (1 - cos(θ))
   R = [r00 r01 r02; r10 r11 r12; r20 r21 r22]
+  @assert abs(det(R) - 1) < 10eps()
   return R
 end
 
@@ -145,21 +164,6 @@ function thermalinitialiser(P, vth, mass, _...)
   pvz .-= mean(pvz)
   momentumtovelocity!(pvx, pvy, pvz, mass)
 end
-
-function Species(P, vth, density, shape::AbstractShape;
-    Lx, Ly, charge, mass, bfield=[0, 0, 1],
-    velocityinitialiser::F=()->thermalinitialiser(P, vth, mass)) where F
-  x = Lx * sample(P, 2, 0.0);
-  y = Ly * sample(P, 3, 0.0);
-  # us pvi to first mean momentum and then velocity, to save RAM
-  vx, vy, vz = velocityinitialiser()
-  p = collect(1:P)
-  xyv = Matrix(hcat(x, y, vx, vy, vz)')
-  chunks = collect(Iterators.partition(1:P, ceil(Int, P/nthreads())))
-  weight = calculateweight(density, P, Lx, Ly)
-  return Species(Float64(charge), Float64(mass), weight, shape, xyv, p, chunks, deepcopy(xyv))
-end
-
 function Base.sort!(s::Species, Δx, Δy)
   sortperm!(s.p, eachindex(s.p),
     by=i->(ceil(Int, s.xyv[1,i] / Δx), ceil(Int, s.xyv[2,i] / Δy), s.xyv[3,i]))

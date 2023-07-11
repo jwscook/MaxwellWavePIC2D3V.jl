@@ -9,7 +9,7 @@ struct ElectrostaticDiagnostics <: AbstractDiagnostics
   Eys::Array{Float64, 3}
   ϕs::Array{Float64, 3}
   ntskip::Int
-  ngskip::Int
+  ngskip::Tuple{Int,Int}
   ti::Ref{Int64}
   makegifs::Bool
   totalenergydensity::Ref{Float64}
@@ -23,11 +23,14 @@ function generatestorage(NX, NY, ND, nscalar, nmomentum, nstorage)
   return (scalarstorage, momentumstorage, fieldstorage)
 end
 
-function ElectrostaticDiagnostics(NX, NY, NT, ntskip, ngskip=1; makegifs=false)
+function ElectrostaticDiagnostics(NX, NY, NT, ntskip, ngskip=(1, 1); makegifs=false)
   @assert NT >= ntskip
-  @assert ispow2(ngskip)
+  ngskip = length(ngskip) == 1 ? (ngskip, ngskip) : ngskip
+  @assert length(ngskip) == 2
+  @assert all(ispow2, ngskip)
+
   scalarstorage, momentumstorage, fieldstorage = generatestorage(
-    NX÷ngskip, NY÷ngskip, NT÷ntskip, 2, 2, 3)
+    NX÷ngskip[1], NY÷ngskip[2], NT÷ntskip, 2, 2, 3)
   return ElectrostaticDiagnostics(scalarstorage..., momentumstorage...,
     fieldstorage..., ntskip, ngskip, Ref(0), makegifs, Ref(0.0), zeros(3))
 end
@@ -53,19 +56,21 @@ struct LorenzGaugeDiagnostics <: AbstractDiagnostics
   Jys::Array{Float64, 3}
   Jzs::Array{Float64, 3}
   ntskip::Int
-  ngskip::Int
+  ngskip::Tuple{Int, Int}
   ti::Ref{Int64}
   makegifs::Bool
   totalenergydensity::Ref{Float64}
   totalmomentumdensitychange::Vector{Float64}
 end
 
-function LorenzGaugeDiagnostics(NX, NY, NT::Int, ntskip::Int, ngskip=1;
+function LorenzGaugeDiagnostics(NX, NY, NT::Int, ntskip::Int, ngskip=(1,1);
                                 makegifs=false)
   @assert NT >= ntskip
-  @assert ispow2(ngskip)
+  ngskip = length(ngskip) == 1 ? (ngskip, ngskip) : ngskip
+  @assert length(ngskip) == 2
+  @assert all(ispow2, ngskip)
   scalarstorage, momentumstorage, fieldstorage = generatestorage(
-    NX÷ngskip, NY÷ngskip, NT÷ntskip, 2, 3, 14)
+    NX÷ngskip[1], NY÷ngskip[2], NT÷ntskip, 2, 3, 14)
   return LorenzGaugeDiagnostics(scalarstorage..., momentumstorage...,
     fieldstorage..., ntskip, ngskip, Ref(0), makegifs, Ref(0.0), zeros(3))
 end
@@ -94,8 +99,8 @@ function diagnose!(d::ElectrostaticDiagnostics, f::ElectrostaticField, plasma,
       if t % d.ntskip == 0
         d.fieldenergydensity[ti] = mean(abs2, f.Exy) / 2
       end
-      a = 1:d.ngskip:size(f.Ex, 1)
-      b = 1:d.ngskip:size(f.Ex, 2)
+      a = 1:d.ngskip[1]:size(f.Ex, 1)
+      b = 1:d.ngskip[2]:size(f.Ex, 2)
       @views d.Exs[:, :, ti] .+= real.(f.Ex[a, b]) ./ d.ntskip
       @views d.Eys[:, :, ti] .+= real.(f.Ey[a, b]) ./ d.ntskip
       f.ffthelper.pifft! * f.ϕ
@@ -110,20 +115,12 @@ function preparefieldsft!(f::AbstractLorenzGaugeField)
   f.ffthelper.pifft! * f.Ay⁰
   f.ffthelper.pifft! * f.Az⁰
   f.ffthelper.pifft! * f.ϕ⁰
-  #f.ffthelper.pifft! * f.ρ⁰
-  #f.ffthelper.pifft! * f.Jx⁰
-  #f.ffthelper.pifft! * f.Jy⁰
-  #f.ffthelper.pifft! * f.Jz⁰
 end
 function restorefieldsft!(f::AbstractLorenzGaugeField)
   f.ffthelper.pfft! * f.Ax⁰
   f.ffthelper.pfft! * f.Ay⁰
   f.ffthelper.pfft! * f.Az⁰
   f.ffthelper.pfft! * f.ϕ⁰
-  #f.ffthelper.pifft! * f.ρ⁰
-  #f.ffthelper.pifft! * f.Jx⁰
-  #f.ffthelper.pifft! * f.Jy⁰
-  #f.ffthelper.pifft! * f.Jz⁰
 end
 
 
@@ -159,23 +156,27 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
           d.fieldmomentumdensity[ti] .= (px, py, pz) ./ length(f.Ex)
         end
         totenergydensity = (d.fieldenergydensity[ti] + d.kineticenergydensity[ti]) / (d.fieldenergydensity[1] + d.kineticenergydensity[1])
-        instanteousmomentumdensity = d.fieldmomentumdensity[ti] + d.particlemomentumdensity[ti]
-        momentumdensitychange = instanteousmomentumdensity
-        momentumdensitychange -= d.fieldmomentumdensity[1]
-        momentumdensitychange -= d.particlemomentumdensity[1]
+        momentumdensity = d.fieldmomentumdensity[ti] + d.particlemomentumdensity[ti]
+        initialtotalmomentumdensity = d.fieldmomentumdensity[1] .+ d.particlemomentumdensity[1]
+        momentumdensitychange = momentumdensity - initialtotalmomentumdensity
+        momentumnormalisation = if norm(initialtotalmomentumdensity) < sqrt(eps()) * norm(d.characteristicmomentumdensity[1])
+            norm(d.characteristicmomentumdensity[1])
+        else
+            norm(initialtotalmomentumdensity)
+        end
         d.totalenergydensity[] = totenergydensity
-        d.totalmomentumdensitychange .= momentumdensitychange #./ d.characteristicmomentumdensity[1]
+        d.totalmomentumdensitychange .= momentumdensitychange ./ momentumnormalisation
       end
       @timeit to "Prepare fields (i)fft!" begin
         preparefieldsft!(f)
       end
       @timeit to "Field averaging" begin
         function average!(lhs, rhs)
-          a = 1:d.ngskip:size(rhs, 1)
-          b = 1:d.ngskip:size(rhs, 2)
-          factor = 1 / (d.ntskip * d.ngskip^2)
+          a = 1:d.ngskip[1]:size(rhs, 1)
+          b = 1:d.ngskip[2]:size(rhs, 2)
+          factor = 1 / (d.ntskip * prod(d.ngskip))
           for (jl, jr) in enumerate(b), (il, ir) in enumerate(a)
-            for jj in 0:d.ngskip-1, ii in 0:d.ngskip-1
+            for jj in 0:d.ngskip[2]-1, ii in 0:d.ngskip[1]-1
               lhs[il, jl, ti] += real(rhs[ir+ii, jr+jj]) * factor
             end
           end
@@ -219,8 +220,8 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   B0 = norm(field.B0)
   dt = timestep(field)
   g = field.gridparams
-  NXd = g.NX÷d.ngskip
-  NYd = g.NY÷d.ngskip
+  NXd = g.NX÷d.ngskip[1]
+  NYd = g.NY÷d.ngskip[2]
   Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
   xs = collect(1:NXd) ./ NXd ./ (vc / w0) * Lx
   ys = collect(1:NYd) ./ NYd ./ (vc / w0) * Ly
@@ -228,10 +229,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   ts = collect(1:ndiags) .* ((NT * dt / ndiags) / (2pi/w0))
 
   filter = sin.((collect(1:ndiags) .- 0.5) ./ ndiags .* pi)'
-  ws = collect(2π / (NT * dt) .* (1:ndiags))
-  @show ws[1]
-  @. ws /= w0
-  @show ws[1]
+  ws = collect(2π / (NT * dt) .* (1:ndiags)) ./ w0
 
   kxs = 2π/Lx .* collect(0:NXd-1) .* (vc / w0);
   kys = 2π/Ly .* collect(0:NYd-1) .* (vc / w0);
@@ -253,10 +251,9 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   savefig("Momenta.png")
 
 
-  wind = findlast(ws .< cutoff)
+  wind = findlast(ws .< cutoff / w0)
   isnothing(wind) && (wind = length(ws)÷2)
   wind = min(wind, length(ws)÷2)
-  @show (ws[1:2], ws[end], cutoff, wind, ws[wind])
 
   kxind = min(length(kxs)÷2-1, 128)
   kyind = min(length(kys)÷2-1, 128)
