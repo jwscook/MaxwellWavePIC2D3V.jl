@@ -51,21 +51,21 @@ function plasmafrequency(s::Species, volume)
   return sqrt(s.charge^2 * numberdensity(s, volume) / s.mass)
 end
 
-function momentum(s::Species, op::F=identity) where F
+function velocityop(s::Species, op::F=identity) where F
   #output = sum(op.(velocities(s)), dims=2)[:] * s.mass * s.weight
-  output = @MVector [0.0, 0.0, 0.0]
+  output = op(@MVector [0.0, 0.0, 0.0])
   for v in eachcol(velocities(s))
-    output .+= op.(v)
+    output += op(v)
   end
-  output .*= s.mass * s.weight
-  return output
+  return output * s.weight
 end
-momentumdensity(s::Species, volume) = momentum(s) / volume
+momentumdensity(s::Species, volume) = velocityop(s) * s.mass / volume
+energydensity(s::Species, volume) = 0.5 * velocityop(s, x->sum(abs2, x)) * s.mass / volume
 function currentdensity(s::Species, volume)
   return momentumdensity(s, volume) / s.mass * s.charge
 end
 
-characteristicmomentumdensity(s::Species, volume) = momentum(s, abs) / volume
+characteristicmomentumdensity(s::Species, volume) = sqrt(2 * s.mass * energydensity(s, volume))
 
 calculateweight(n0, P, Lx, Ly) = n0 * Lx * Ly / P;
 

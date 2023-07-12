@@ -160,8 +160,10 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
         initialtotalmomentumdensity = d.fieldmomentumdensity[1] .+ d.particlemomentumdensity[1]
         momentumdensitychange = momentumdensity - initialtotalmomentumdensity
         momentumnormalisation = if norm(initialtotalmomentumdensity) < sqrt(eps()) * norm(d.characteristicmomentumdensity[1])
+            ti == 1 && @info "Normalising momentum by sum of species characteristic momentum scalar"
             norm(d.characteristicmomentumdensity[1])
         else
+            ti == 1 && @info "Normalising momentum by sum of initial species momentum density vector"
             norm(initialtotalmomentumdensity)
         end
         d.totalenergydensity[] = totenergydensity
@@ -254,6 +256,7 @@ function plotfields(d::AbstractDiagnostics, field, n0, vc, w0, NT; cutoff=Inf)
   wind = findlast(ws .< cutoff / w0)
   isnothing(wind) && (wind = length(ws)÷2)
   wind = min(wind, length(ws)÷2)
+  @show ws[1], wind, ws[wind]
 
   kxind = min(length(kxs)÷2-1, 128)
   kyind = min(length(kys)÷2-1, 128)

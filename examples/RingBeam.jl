@@ -50,7 +50,7 @@ function pic()
   to = TimerOutput()
 
   NQ = 128
-  NX = 2^9 * NQ #10
+  NX = 2^10 * NQ #10
   NY = 1#2^9 ÷ NQ #10
 
   L0 = L / m_lengthScale
@@ -67,7 +67,7 @@ function pic()
   Ly = Lx * NY / NX
   dt = Lx / NX / 2
   P = NX * NY * 8
-  NT = 2^13
+  NT = 2^15
   Δx = Lx / NX
   Δx = Lx / NX
   Δy = Ly / NY
@@ -121,7 +121,7 @@ diagnostics, field, plasma, n0, vcharacteristic, omegacharacteristic, NT, B0 = p
 
 
 MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegacharacteristic, NT;
-                              cutoff=20 * omegacharacteristic)
+                              cutoff=100 * omegacharacteristic)
 
 const filecontents = [i for i in readlines(open(@__FILE__))]
 
