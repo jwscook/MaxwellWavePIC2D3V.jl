@@ -1,7 +1,7 @@
 
 struct EJField{T, U} <: AbstractLorenzGaugeField
   imex::T
-  buffers::OffsetArray{Float64, 4, Array{Float64, 4}}
+  depositionbuffer::OffsetArray{Float64, 4, Array{Float64, 4}}
   ϕ⁰::Array{ComplexF64, 2}
   Ax⁰::Array{ComplexF64, 2}
   Ay⁰::Array{ComplexF64, 2}
@@ -39,15 +39,18 @@ struct EJField{T, U} <: AbstractLorenzGaugeField
 end
 
 function EJField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
-    imex::AbstractImEx=Explicit(), buffer=0)
-  EBxyz = OffsetArray(zeros(6, NX+2buffer, NY+2buffer), 1:6, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer);
-  Axyz = OffsetArray(zeros(3, NX+2buffer, NY+2buffer), 1:3, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer);
+        imex::AbstractImEx=Explicit(), buffers=(0, 0))
+  buffers = length(buffers) == 1 ? (buffers, buffers) : buffers
+  @assert length(buffers) == 2
+  bufferx, buffery = buffers
+  EBxyz = OffsetArray(zeros(6, NX+2bufferx, NY+2buffery), 1:6, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
+  Axyz = OffsetArray(zeros(3, NX+2bufferx, NY+2buffery), 1:3, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
   gps = GridParameters(Lx, Ly, NX, NY)
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   boris = ElectromagneticBoris(dt)
-  buffers = OffsetArray(zeros(4, NX+2buffer, NY+2buffer, nthreads()),
-    1:4, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
-  return EJField(imex, buffers,
+  depositarray = OffsetArray(zeros(4, NX+2bufferx, NY+2buffery, nthreads()),
+    1:4, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery, 1:nthreads());
+  return EJField(imex, depositarray,
     (zeros(ComplexF64, NX, NY) for _ in 1:27)..., EBxyz, Axyz,# 22
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt)
 end
@@ -136,10 +139,10 @@ function loop!(plasma, field::EJField, to, t)
 
 
   @timeit to "Particle Loop" begin
-    @threads for j in axes(field.buffers, 4)
-      J⁰ = @view field.buffers[2:4, :, :, j]
+    @threads for j in axes(field.depositionbuffers, 4)
+      J⁰ = @view field.depositionbuffers[2:4, :, :, j]
       J⁰ .= 0
-      ρ⁰ = @view field.buffers[1, :, :, j]
+      ρ⁰ = @view field.depositionbuffers[1, :, :, j]
       ρ⁰ .= 0
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
@@ -176,7 +179,7 @@ function loop!(plasma, field::EJField, to, t)
   end
 
   @timeit to "Field Reduction" begin
-    reduction!(field.ρ⁰, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.buffers)
+    reduction!(field.ρ⁰, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.depositionbuffers)
   end
 
 end

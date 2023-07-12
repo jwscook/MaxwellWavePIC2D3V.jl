@@ -48,13 +48,16 @@ end
 
 function LorenzGaugeSemiImplicitField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
     fieldimex::AbstractImEx=Explicit(), sourceimex::AbstractImEx=Explicit(),
-    buffer=0, rtol=sqrt(eps()), maxiters=10)
-  EBxyz = OffsetArray(zeros(6, NX+2buffer, NY+2buffer), 1:6, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer);
+    buffers=(0,0), rtol=sqrt(eps()), maxiters=10)
+  buffers = length(buffers) == 1 ? (buffers, buffers) : buffers
+  @assert length(buffers) == 2
+  bufferx, buffery = buffers
+  EBxyz = OffsetArray(zeros(6, NX+2bufferx, NY+2buffery), 1:6, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
   gps = GridParameters(Lx, Ly, NX, NY)
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   boris = ElectromagneticBoris(dt)
-  Js = OffsetArray(zeros(3, NX+2buffer, NY+2buffer, nthreads()),
-    1:3, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
+  Js = OffsetArray(zeros(3, NX+2bufferx, NY+2buffery, nthreads()),
+    1:3, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery, 1:nthreads());
   return LorenzGaugeSemiImplicitField(fieldimex, sourceimex, Js, deepcopy(Js), deepcopy(Js),
     deepcopy(Js), (zeros(ComplexF64, NX, NY) for _ in 1:30)..., EBxyz,
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt, rtol, maxiters)

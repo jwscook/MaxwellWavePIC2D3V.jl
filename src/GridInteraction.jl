@@ -22,6 +22,7 @@ end
 
 bspline(::BSplineWeighting{@stat N}, x) where N = bspline(BSplineWeighting{Int(N)}(), x)
 
+@inline bspline(::BSplineWeighting{-1}, x) = ((1.0),)
 @inline bspline(::BSplineWeighting{0}, x) = ((1.0),)
 @inline bspline(::BSplineWeighting{1}, x) = (x, 1-x)
 function bspline(::BSplineWeighting{2}, x)
@@ -63,8 +64,12 @@ function bspline(::BSplineWeighting{5}, x)
   return (a, b, c, d, e, f)
 end
 
+@inline indices(::BSplineWeighting{StaticNumbers.static(-1)}, i) = i
+@inline indices(::BSplineWeighting{-1}, i) = inidices(BSplineWeighting{@stat -1}, i)
+@inline indices(::BSplineWeighting{N}, i) where N = (i-fld(N, 2)):(i+cld(N, 2))
 @inline indices(::BSplineWeighting{N}, i) where N = (i-fld(N, 2)):(i+cld(N, 2))
 
+_bsplineinputs(::BSplineWeighting{@stat -1}, i, centre) = (i, 1.0)
 for N in 0:2:10
   @eval _bsplineinputs(::BSplineWeighting{@stat $(N+1)}, i, centre) = (i, 1 - centre)
   @eval function _bsplineinputs(::BSplineWeighting{@stat $N}, i, centre)

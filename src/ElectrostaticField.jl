@@ -13,9 +13,12 @@ struct ElectrostaticField{T} <: AbstractField
   boris::ElectrostaticBoris
 end
 
-function ElectrostaticField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0, buffer=3)
-  ρs = OffsetArray(zeros(NX+2buffer, NY+2buffer, nthreads()), -(buffer-1):NX+buffer, -(buffer-1):NY+buffer, 1:nthreads());
-  Exy = OffsetArray(zeros(2, NX+2buffer, NY+2buffer), 1:2, -(buffer-1):NX+buffer, -(buffer-1):NY+buffer);
+function ElectrostaticField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0, buffers=(3, 3))
+  buffers = length(buffers) == 1 ? (buffers, buffers) : buffers
+  @assert length(buffers) == 2
+  bufferx, buffery = buffers
+  ρs = OffsetArray(zeros(NX+2bufferx, NY+2buffery, nthreads()), -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery, 1:nthreads());
+  Exy = OffsetArray(zeros(2, NX+2bufferx, NY+2buffery), 1:2, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   gps = GridParameters(Lx, Ly, NX, NY)
   boris = ElectrostaticBoris([B0x, B0y, B0z], dt)

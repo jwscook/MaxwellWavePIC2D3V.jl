@@ -76,14 +76,14 @@ function pic()
   ngskip = (4,1)
   @show NT ÷ ntskip
   field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
-    imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
+    imex=MaxwellWavePIC2D3V.ImEx(1), buffers=(10, 0))
   #field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
-  #  imex=MaxwellWavePIC2D3V.ImEx(1), buffer=10)
+  #  imex=MaxwellWavePIC2D3V.ImEx(1), buffers=(10, 0))
   #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0x=B0,
   #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
-  #  buffer=10, rtol=sqrt(eps()), maxiters=1000)
+  #  buffers=(10, 0), rtol=sqrt(eps()), maxiters=1000)
   diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
-  shapes = (MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}(), MaxwellWavePIC2D3V.BSplineWeighting{@stat 0}())
+  shapes = (MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}(), MaxwellWavePIC2D3V.BSplineWeighting{@stat -1}())
   electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shapes;
     Lx=Lx, Ly=Ly, charge=-1, mass=Me)
   ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0 * (1 - 1/1000), shapes,
