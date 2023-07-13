@@ -7,6 +7,7 @@ using TimerOutputs, StaticNumbers, OffsetArrays, FastPow, ThreadsX
 using QuasiMonteCarlo
 
 abstract type AbstractShape end
+Base.length(::AbstractShape) = 1
 struct NGPWeighting <: AbstractShape end
 struct AreaWeighting <: AbstractShape end
 struct BSpline2Weighting <: AbstractShape end
