@@ -21,11 +21,13 @@ function pic()
   EPSILON_0 = 1.0 / MU_0 / SPEED_OF_LIGHT / SPEED_OF_LIGHT;
 
   n = 1e20
-  B = 2.1
   Mi = 64 #2 * 1836
   Me = 1
+  #B = 2.1
+  #Va = B / sqrt(MU_0 * Mi * ELEMENTARY_MASS * n)
+  Va = SPEED_OF_LIGHT / 10
+  B = Va * sqrt(MU_0 * Mi * ELEMENTARY_MASS * n)
 
-  Va = B / sqrt(MU_0 * Mi * ELEMENTARY_MASS * n)
   Wp = ELEMENTARY_CHARGE * sqrt(n / Me / ELEMENTARY_MASS / EPSILON_0)
   TeeV = 0.5 * ELEMENTARY_MASS * Me * (Va / 10)^2 / ELEMENTARY_CHARGE
   vthe = sqrt(TeeV * ELEMENTARY_CHARGE * 2 / Me / ELEMENTARY_MASS)
@@ -61,18 +63,19 @@ function pic()
   Va = Va / SPEED_OF_LIGHT
 
   Ωi = B0 / Mi
+  Ωe = B0 / Me
   ld = vth / Πe
 
   Lx = L0
   Ly = Lx * NY / NX
   dt = Lx / NX / 2
-  P = NX * NY * 8
-  NT = 2^15
+  P = NX * NY * 2
+  NT = 2^17
   Δx = Lx / NX
   Δx = Lx / NX
   Δy = Ly / NY
 
-  ntskip = 16
+  ntskip = 32
   ngskip = (4,1)
   @show NT ÷ ntskip
   field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
@@ -83,7 +86,7 @@ function pic()
   #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
   #  buffers=(10, 0), rtol=sqrt(eps()), maxiters=1000)
   diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
-  shapes = (MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}(), MaxwellWavePIC2D3V.BSplineWeighting{@stat -1}())
+  shapes = (MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}(), MaxwellWavePIC2D3V.NGPWeighting())#MaxwellWavePIC2D3V.BSplineWeighting{@stat -1}())
   electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shapes;
     Lx=Lx, Ly=Ly, charge=-1, mass=Me)
   ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0 * (1 - 1/1000), shapes,
@@ -114,17 +117,17 @@ function pic()
 
   show(to)
 
-  return diagnostics, field, plasma, n0, Va, Ωi, NT, B0
+  return diagnostics, field, plasma, n0, Va, abs(Ωe), NT, B0
 end
 using StatProfilerHTML
 diagnostics, field, plasma, n0, vcharacteristic, omegacharacteristic, NT, B0 = pic()
 
 
 MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegacharacteristic, NT;
-                              cutoff=100 * omegacharacteristic)
+                              cutoff=20 * omegacharacteristic)
 
 const filecontents = [i for i in readlines(open(@__FILE__))]
 
-@save "$(hash(filecontents))" filecontents diagnostics field plasma n0 vcharacteristic omegacharacteristic NT B0
+@save "$(hash(filecontents)).jld2" filecontents diagnostics field plasma n0 vcharacteristic omegacharacteristic NT B0
 
 
