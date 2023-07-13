@@ -117,3 +117,18 @@ function deposit!(z::AbstractArray{<:Number, 3}, shapes, x, y, NX_Lx, NY_Ly, w1,
 end
 
 
+function deposit!(z::AbstractArray{<:Number, 3}, shapes, x, y, NX_Lx, NY_Ly, ws::NTuple{N, T}
+    ) where {N, T}
+  NV, NX, NY = size(z)
+  @assert NV == N
+  for (j, wy) in depositindicesfractions(shapes[2], y, NY, NY_Ly)
+    for (i, wx) in depositindicesfractions(shapes[1], x, NX, NX_Lx)
+      wxy = wx * wy
+      for h in 1:N
+        @muladd z[h,i,j] = z[h,i,j] + wxy * ws[h]
+      end
+    end
+  end
+end
+
+

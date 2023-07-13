@@ -1,7 +1,7 @@
 
 struct LorenzGaugeField{T, U} <: AbstractLorenzGaugeField
   imex::T
-  Js⁰::OffsetArray{Float64, 4, Array{Float64, 4}}
+  depositionbuffer::OffsetArray{Float64, 4, Array{Float64, 4}}
   ϕ⁺::Array{ComplexF64, 2}
   ϕ⁰::Array{ComplexF64, 2}
   Ax⁺::Array{ComplexF64, 2}
@@ -20,6 +20,9 @@ struct LorenzGaugeField{T, U} <: AbstractLorenzGaugeField
   Bx::Array{ComplexF64, 2}
   By::Array{ComplexF64, 2}
   Bz::Array{ComplexF64, 2}
+  px_q::Array{ComplexF64, 2}
+  py_q::Array{ComplexF64, 2}
+  pz_q::Array{ComplexF64, 2}
   EBxyz::OffsetArray{Float64, 3, Array{Float64, 3}}
   B0::NTuple{3, Float64}
   gridparams::GridParameters
@@ -37,45 +40,15 @@ function LorenzGaugeField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
   gps = GridParameters(Lx, Ly, NX, NY)
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   boris = ElectromagneticBoris(dt)
-  Js = OffsetArray(zeros(3, NX+2bufferx, NY+2buffery, nthreads()),
-    1:3, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery, 1:nthreads());
-  return LorenzGaugeField(imex, Js,
-    (zeros(ComplexF64, NX, NY) for _ in 1:18)..., EBxyz, # 22
+  depositionbuffer = OffsetArray(zeros(6, NX+2bufferx, NY+2buffery, nthreads()),
+    1:6, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery, 1:nthreads());
+  return LorenzGaugeField(imex, depositionbuffer,
+    (zeros(ComplexF64, NX, NY) for _ in 1:21)..., EBxyz, # 22
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt)
 end
 
 function warmup!(field::LorenzGaugeField, plasma, to)
   return nothing
-  #@timeit to "Warmup" begin
-  #  dt = timestep(field)
-  #  Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
-  #  NX_Lx, NY_Ly = field.gridparams.NX_Lx, field.gridparams.NY_Ly
-  #  ΔV = cellvolume(field.gridparams)
-  #  advect!(plasma, field.gridparams, -dt, to) # n -1
-  #  @threads for j in axes(field.Js⁰, 4)
-  #    J⁰ = @view field.Js⁰[:, :, :, j]#[1, :, :, j]
-  #    J⁰ .= 0
-  #    for species in plasma
-  #      qw_ΔV = species.charge * species.weight / ΔV
-  #      q_m = species.charge / species.mass
-  #      x = @view positions(species)[1, :]
-  #      y = @view positions(species)[2, :]
-  #      vx = @view velocities(species)[1, :]
-  #      vy = @view velocities(species)[2, :]
-  #      vz = @view velocities(species)[3, :]
-  #      @inbounds for i in species.chunks[j]
-  #        #deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
-  #        deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
-  #          vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
-  #      end
-  #    end
-  #  end
-  #  #reduction!(field.ρ⁰, (@view field.Js⁰[1, :, :, :]))
-  #  reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰)
-  #  #neglaplacesolve!(field.ϕ⁰, field.ρ⁰, field.ffthelper)
-  #  advect!(plasma, field.gridparams, dt, to) # n
-  #  field.Js⁰ .= 0.0
-  #end
 end
 
 
@@ -148,11 +121,12 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
   # we now have the E and B fields at n+1/2
 
   @timeit to "Particle Loop" begin
-    @threads for j in axes(field.Js⁰, 4)
-      J⁰ = @view field.Js⁰[:, :, :, j]
-      J⁰ .= 0
+    @threads for j in axes(field.depositionbuffer, 4)
+      Jp_q = @view field.depositionbuffer[:, :, :, j]
+      Jp_q .= 0
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
+        mw_qΔV = species.mass * species.weight / species.charge / ΔV
         q_m = species.charge / species.mass
         x = @view positions(species)[1, :]
         y = @view positions(species)[2, :]
@@ -170,20 +144,26 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
         @inbounds for i in species.chunks[j]
           Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
           @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
-          vxi, vyi = vx[i], vy[i]
+          vxi, vyi, vzi = vx[i], vy[i], vz[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
           @assert all(isfinite, (x[i], y[i], vxi, vyi, vx[i], vy[i]))
           x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
           y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
-          deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
-            vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
+          deposit!(Jp_q, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
+            # first 3 are current
+            (vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV, # current
+            # change in momentum per charge
+            vx[i] * mw_qΔV, vy[i] * mw_qΔV, vz[i] * mw_qΔV))
         end
       end
     end
   end
   @timeit to "Field Reduction" begin
-    reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰)
+      reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, (@view field.depositionbuffer[1:3, :, :, :]))
+      reduction!(field.px_q, field.py_q, field.pz_q, (@view field.depositionbuffer[4:6, :, :, :]))
   end
+  field.ffthelper.pfft! * field.px_q
+  @show field.Ax⁺[1:2, 1:2], field.px_q[1:2, 1:2]
 end
 

@@ -45,7 +45,7 @@ include("FFTHelper.jl")
     for (i, wx) in depositindicesfractions(shapes[1], xi, NX, NX_Lx)
       wxy = wx * wy
       @simd for h in 1:6
-          output[h] += f.EBxyz[h, i, j] * wxy
+        output[h] += f.EBxyz[h, i, j] * wxy
       end
     end
   end
