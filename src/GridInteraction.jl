@@ -6,7 +6,7 @@ using CommonSubexpressions
   # no need for unimod with offset arrays
   i = ceil(Int, zNZ) # cell number
   r = i - zNZ; # distance into cell i in units of cell width
-  @assert 0 < r <= 1 "z = $z, NZ = $NZ, NZ_Lz = $NZ_Lz, i = $i, r = $r"
+  @assert 0 <= r <= 1 "z = $z, NZ = $NZ, NZ_Lz = $NZ_Lz, i = $i, r = $r"
   return gridinteractiontuple(s, i, r, NZ)
 end
 
