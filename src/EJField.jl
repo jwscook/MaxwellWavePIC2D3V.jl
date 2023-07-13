@@ -69,6 +69,7 @@ function loop!(plasma, field::EJField, to, t)
   # At this point Ai⁰ stores the (n+0)th timestep value and Ai⁻ the (n-1)th
   #               ϕ⁰  stores the (n-1/2)th timestep value and ϕ⁻ the (n-3/2)th
   @timeit to "Field Forward FT" begin
+    field.ffthelper.pfft! * field.ρ⁰;
     field.ffthelper.pfft! * field.Jx⁺;
     field.ffthelper.pfft! * field.Jy⁺;
     field.ffthelper.pfft! * field.Jz⁺;
