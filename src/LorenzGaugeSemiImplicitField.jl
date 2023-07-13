@@ -36,7 +36,7 @@ struct LorenzGaugeSemiImplicitField{T, U, V} <: AbstractLorenzGaugeField
   Bx::Array{ComplexF64, 2}
   By::Array{ComplexF64, 2}
   Bz::Array{ComplexF64, 2}
-  EBxyz::OffsetArray{Float64, 3, Array{Float64, 3}}
+  BExyz::OffsetArray{Float64, 3, Array{Float64, 3}}
   B0::NTuple{3, Float64}
   gridparams::GridParameters
   ffthelper::V
@@ -52,14 +52,14 @@ function LorenzGaugeSemiImplicitField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B
   buffers = length(buffers) == 1 ? (buffers, buffers) : buffers
   @assert length(buffers) == 2
   bufferx, buffery = buffers
-  EBxyz = OffsetArray(zeros(6, NX+2bufferx, NY+2buffery), 1:6, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
+  BExyz = OffsetArray(zeros(6, NX+2bufferx, NY+2buffery), 1:6, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
   gps = GridParameters(Lx, Ly, NX, NY)
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   boris = ElectromagneticBoris(dt)
   Js = OffsetArray(zeros(3, NX+2bufferx, NY+2buffery, nthreads()),
     1:3, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery, 1:nthreads());
   return LorenzGaugeSemiImplicitField(fieldimex, sourceimex, Js, deepcopy(Js), deepcopy(Js),
-    deepcopy(Js), (zeros(ComplexF64, NX, NY) for _ in 1:30)..., EBxyz,
+    deepcopy(Js), (zeros(ComplexF64, NX, NY) for _ in 1:30)..., BExyz,
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt, rtol, maxiters)
 end
 
@@ -105,7 +105,7 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
           vyʷ = @view velocities(species; work=true)[2, :]
           vzʷ = @view velocities(species; work=true)[3, :]
           for i in species.chunks[j]
-            Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
+            Bxi, Byi, Bzi, Exi, Eyi, Ezi  = field(species.shapes, species.Exy, x[i], y[i])
             xʷ[i] = unimod(x[i] + vx[i] * dt, Lx)
             yʷ[i] = unimod(y[i] + vy[i] * dt, Ly)
             vxʷ[i], vyʷ[i], vzʷ[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
@@ -159,7 +159,8 @@ function loop!(plasma, field::LorenzGaugeSemiImplicitField, to, t, plasmacopy = 
       field.ffthelper.pifft! * field.By
       field.ffthelper.pifft! * field.Bz
     end
-    @timeit to "Field Update" update!(field)
+    @timeit to "Field Update" update!(field.BExyz, (field.Ex, field.Ey, field.z, field.Bx, field.By, field.Bz))
+    @timeit to "Add B0" addB0!((@view field.BExyz[1:3, :, :]), field.B0)
   end
   @timeit to "Copy over buffers" begin
     field.Js⁻ .= field.Js⁰

@@ -35,38 +35,37 @@ include("Species.jl")
 include("GridParameters.jl")
 include("FFTHelper.jl")
 
-
-@inline function (f::AbstractLorenzGaugeField)(shapes, xi::T, yi::T) where T
+@inline function (f::AbstractLorenzGaugeField)(output, shapes, buffer, xi::T, yi::T, L) where T
   NX, NY = f.gridparams.NX, f.gridparams.NY
   NX_Lx, NY_Ly = f.gridparams.NX_Lx, f.gridparams.NY_Ly
-  U = promote_type(T, real(eltype(f.EBxyz)))
-  output = MVector{6, U}(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+  U = promote_type(T, real(eltype(buffer)))
+  fill!(output, 0)
   for (j, wy) in depositindicesfractions(shapes[2], yi, NY, NY_Ly)
     for (i, wx) in depositindicesfractions(shapes[1], xi, NX, NX_Lx)
       wxy = wx * wy
-      @simd for h in 1:6
-        output[h] += f.EBxyz[h, i, j] * wxy
+      @simd for h in 1:size(buffer, 1)
+        output[h] += buffer[h, i, j] * wxy
       end
     end
   end
   return output
 end
 
-function update!(f::AbstractLorenzGaugeField)
-  f.EBxyz .= 0.0
-  t0 = @spawn applyperiodicity!((@view f.EBxyz[1, :, :]), f.Ex)
-  t1 = @spawn applyperiodicity!((@view f.EBxyz[2, :, :]), f.Ey)
-  t2 = @spawn applyperiodicity!((@view f.EBxyz[3, :, :]), f.Ez)
-  t3 = @spawn applyperiodicity!((@view f.EBxyz[4, :, :]), f.Bx)
-  t4 = @spawn applyperiodicity!((@view f.EBxyz[5, :, :]), f.By)
-  t5 = @spawn applyperiodicity!((@view f.EBxyz[6, :, :]), f.Bz)
-  wait.((t0, t1, t2, t3, t4, t5))
-  @threads for k in axes(f.EBxyz, 3)
-    for j in axes(f.EBxyz, 2), i in 1:3
-      f.EBxyz[i+3, j, k] += @inbounds f.B0[i]
+function update!(buffer, rhses::NTuple{N, T}
+    ) where {N, T}
+  buffer .= 0.0
+  ts = map(i->(@spawn applyperiodicity!((@view buffer[i, :, :]), rhses[i])), 1:N)
+  wait.(ts)
+end
+
+function addB0!(buffer, B0)
+  @threads for k in axes(buffer, 3)
+    for j in axes(buffer, 2), i in 1:3
+      buffer[i, j, k] += @inbounds B0[i]
     end
   end
 end
+
 
 
 include("ElectrostaticField.jl")

@@ -23,7 +23,8 @@ struct LorenzGaugeField{T, U} <: AbstractLorenzGaugeField
   px_q::Array{ComplexF64, 2}
   py_q::Array{ComplexF64, 2}
   pz_q::Array{ComplexF64, 2}
-  EBxyz::OffsetArray{Float64, 3, Array{Float64, 3}}
+  ABExyz::OffsetArray{Float64, 3, Array{Float64, 3}}
+  A⁺xyz::OffsetArray{Float64, 3, Array{Float64, 3}}
   B0::NTuple{3, Float64}
   gridparams::GridParameters
   ffthelper::U
@@ -36,22 +37,21 @@ function LorenzGaugeField(NX, NY=NX, Lx=1, Ly=1; dt, B0x=0, B0y=0, B0z=0,
   buffers = length(buffers) == 1 ? (buffers, buffers) : buffers
   @assert length(buffers) == 2
   bufferx, buffery = buffers
-  EBxyz = OffsetArray(zeros(6, NX+2bufferx, NY+2buffery), 1:6, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
+  ABExyz = OffsetArray(zeros(9, NX+2bufferx, NY+2buffery), 1:9, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
+  A⁺xyz = OffsetArray(zeros(3, NX+2bufferx, NY+2buffery), 1:3, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery);
   gps = GridParameters(Lx, Ly, NX, NY)
   ffthelper = FFTHelper(NX, NY, Lx, Ly)
   boris = ElectromagneticBoris(dt)
   depositionbuffer = OffsetArray(zeros(6, NX+2bufferx, NY+2buffery, nthreads()),
     1:6, -(bufferx-1):NX+bufferx, -(buffery-1):NY+buffery, 1:nthreads());
   return LorenzGaugeField(imex, depositionbuffer,
-    (zeros(ComplexF64, NX, NY) for _ in 1:21)..., EBxyz, # 22
+    (zeros(ComplexF64, NX, NY) for _ in 1:21)..., ABExyz, A⁺xyz,# 22
     Float64.((B0x, B0y, B0z)), gps, ffthelper, boris, dt)
 end
 
 function warmup!(field::LorenzGaugeField, plasma, to)
   return nothing
 end
-
-
 
 
 function loop!(plasma, field::LorenzGaugeField, to, t)
@@ -115,36 +115,55 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     field.ffthelper.pifft! * field.Bx
     field.ffthelper.pifft! * field.By
     field.ffthelper.pifft! * field.Bz
+    field.ffthelper.pifft! * field.Ax⁺
+    field.ffthelper.pifft! * field.Ay⁺
+    field.ffthelper.pifft! * field.Az⁺
+    field.ffthelper.pifft! * field.Ax⁰
+    field.ffthelper.pifft! * field.Ay⁰
+    field.ffthelper.pifft! * field.Az⁰
   end
-  @timeit to "Field Update" update!(field)
 
+  @timeit to "Field Update" begin
+    update!(field.ABExyz, (field.Ax⁰, field.Ay⁰, field.Az⁰,
+                           field.Ex, field.Ey, field.Ez,
+                           field.Bx, field.By, field.Bz))
+    addB0!((@view field.ABExyz[7:9, :, :]), field.B0)
+    update!(field.A⁺xyz, (field.Ax⁺, field.Ay⁺, field.Az⁺))
+  end
+
+  @timeit to "Field Forward FT" begin
+    field.ffthelper.pfft! * field.Ax⁺
+    field.ffthelper.pfft! * field.Ay⁺
+    field.ffthelper.pfft! * field.Az⁺
+    field.ffthelper.pfft! * field.Ax⁰
+    field.ffthelper.pfft! * field.Ay⁰
+    field.ffthelper.pfft! * field.Az⁰
+  end
   # we now have the E and B fields at n+1/2
 
   @timeit to "Particle Loop" begin
     @threads for j in axes(field.depositionbuffer, 4)
+      three = @MVector zeros(3)
+      nine = @MVector zeros(9)
       Jp_q = @view field.depositionbuffer[:, :, :, j]
       Jp_q .= 0
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
-        m_qΔV = species.mass * species.weight / species.charge / ΔV
+        m_qΔV = species.mass / species.charge / ΔV * species.weight
         q_m = species.charge / species.mass
         x = @view positions(species)[1, :]
         y = @view positions(species)[2, :]
         vx = @view velocities(species)[1, :]
         vy = @view velocities(species)[2, :]
         vz = @view velocities(species)[3, :]
-        #  E.....E.....E
-        #  B.....B.....B
-        #  ...ϕ.....ϕ.....ϕ
-        #  A..0..A..+..A
-        #  ...ρ.....ρ.....ρ
-        #  J.....J.....J
-        #  x.....x.....x
-        #  v.....v.....v
         @inbounds for i in species.chunks[j]
-          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
+          Axi, Ayi, Azi, Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(nine, species.shapes, field.ABExyz, x[i], y[i], @stat 9)
           @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
           vxi, vyi, vzi = vx[i], vy[i], vz[i]
+          γ = 1/sqrt(1 - vxi^2 - vyi^2 - vzi^2)
+          pxi = vxi * species.mass * γ + Axi * species.charge * species.weight
+          pyi = vyi * species.mass * γ + Ayi * species.charge * species.weight
+          pzi = vzi * species.mass * γ + Azi * species.charge * species.weight
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
           @assert all(isfinite, (x[i], y[i], vxi, vyi, vx[i], vy[i]))
@@ -155,6 +174,14 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
             (vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV, # current
             # change in momentum per charge
             vx[i] * m_qΔV, vy[i] * m_qΔV, vz[i] * m_qΔV))
+          Axi, Ayi, Azi = field(three, species.shapes, field.A⁺xyz, x[i], y[i], @stat 3)
+          vnew = (vx[i], vy[i], vz[j])
+          γ = 1/sqrt(1 - vxi^2 - vyi^2 - vzi^2)
+          vx[i] = (pxi - Axi * species.charge) / species.mass / γ
+          vy[i] = (pyi - Ayi * species.charge) / species.mass / γ
+          vz[i] = (pzi - Azi * species.charge) / species.mass / γ
+          vcorrected = (vx[i], vy[i], vz[j])
+          #@show vcorrected ./ vnew
         end
       end
     end
@@ -163,9 +190,9 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
       reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, (@view field.depositionbuffer[1:3, :, :, :]))
       reduction!(field.px_q, field.py_q, field.pz_q, (@view field.depositionbuffer[4:6, :, :, :]))
   end
-  field.ffthelper.pifft! * field.Ax⁺
-  @show mean(field.Ax⁺ ./ field.px_q)
-  @show std(field.Ax⁺ ./ field.px_q)
-  field.ffthelper.pfft! * field.Ax⁺
+#  field.ffthelper.pifft! * field.Ax⁺
+#  @show mean(field.Ax⁺ ./ field.px_q)
+#  @show std(field.Ax⁺ ./ field.px_q)
+#  field.ffthelper.pfft! * field.Ax⁺
 end
 

@@ -138,7 +138,7 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
       ti = d.ti[]
       if t % d.ntskip == 0
         @timeit to "Energy" begin
-          d.fieldenergydensity[ti] = mean(abs2, f.EBxyz) / 2
+          d.fieldenergydensity[ti] = mean(abs2, f.ABExyz[1:6, :, :]) / 2
         end
         @timeit to "Momentum" begin
           px, py, pz = 0.0, 0.0, 0.0
