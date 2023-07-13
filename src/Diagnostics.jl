@@ -159,7 +159,7 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
         momentumdensity = d.fieldmomentumdensity[ti] + d.particlemomentumdensity[ti]
         initialtotalmomentumdensity = d.fieldmomentumdensity[1] .+ d.particlemomentumdensity[1]
         momentumdensitychange = momentumdensity - initialtotalmomentumdensity
-        momentumnormalisation = if norm(initialtotalmomentumdensity) < sqrt(eps()) * norm(d.characteristicmomentumdensity[1])
+        momentumnormalisation = if norm(initialtotalmomentumdensity) < 0.01 * norm(d.characteristicmomentumdensity[1])
             ti == 1 && @info "Normalising momentum by sum of species characteristic momentum scalar"
             norm(d.characteristicmomentumdensity[1])
         else
