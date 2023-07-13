@@ -139,10 +139,10 @@ function loop!(plasma, field::EJField, to, t)
 
 
   @timeit to "Particle Loop" begin
-    @threads for j in axes(field.depositionbuffers, 4)
-      J⁰ = @view field.depositionbuffers[2:4, :, :, j]
+    @threads for j in axes(field.depositionbuffer, 4)
+      J⁰ = @view field.depositionbuffer[2:4, :, :, j]
       J⁰ .= 0
-      ρ⁰ = @view field.depositionbuffers[1, :, :, j]
+      ρ⁰ = @view field.depositionbuffer[1, :, :, j]
       ρ⁰ .= 0
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
@@ -179,7 +179,7 @@ function loop!(plasma, field::EJField, to, t)
   end
 
   @timeit to "Field Reduction" begin
-    reduction!(field.ρ⁰, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.depositionbuffers)
+    reduction!(field.ρ⁰, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.depositionbuffer)
   end
 
 end
