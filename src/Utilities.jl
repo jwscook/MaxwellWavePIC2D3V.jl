@@ -177,6 +177,8 @@ function printresolutions(plasma, field, dt, NT, to)
     Π = plasmafrequency(species, Lx * Ly)
     λ_D = vth / Π
     r_L = vth / Ω
+    println("    shapes           = ", species.shapes)
+    println("    weight           = ", species.weight)
     println("    vth / c          = ", vth)
     println("    vth / Va         = ", vth / Va)
     println("    c / vth          = ", 1 / vth)

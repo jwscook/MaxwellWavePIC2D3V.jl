@@ -89,10 +89,10 @@ function pic()
     @show NT ÷ ntskip
     #dt = 2dl #/6vth
     #dt = dl / vth
-    #field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
-    #  imex=MaxwellWavePIC2D3V.ImEx(1), buffers=10)
-    field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+    field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
       imex=MaxwellWavePIC2D3V.ImEx(1), buffers=10)
+    #field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+    #  imex=MaxwellWavePIC2D3V.ImEx(1), buffers=10)
     #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
     #  buffers=10, rtol=100eps(), maxiters=1000)

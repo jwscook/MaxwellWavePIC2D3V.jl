@@ -126,7 +126,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
       Jp_q .= 0
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
-        mw_qΔV = species.mass * species.weight / species.charge / ΔV
+        m_qΔV = species.mass * species.weight / species.charge / ΔV
         q_m = species.charge / species.mass
         x = @view positions(species)[1, :]
         y = @view positions(species)[2, :]
@@ -154,7 +154,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
             # first 3 are current
             (vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV, # current
             # change in momentum per charge
-            vx[i] * mw_qΔV, vy[i] * mw_qΔV, vz[i] * mw_qΔV))
+            vx[i] * m_qΔV, vy[i] * m_qΔV, vz[i] * m_qΔV))
         end
       end
     end
@@ -163,7 +163,9 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
       reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, (@view field.depositionbuffer[1:3, :, :, :]))
       reduction!(field.px_q, field.py_q, field.pz_q, (@view field.depositionbuffer[4:6, :, :, :]))
   end
-  field.ffthelper.pfft! * field.px_q
-  @show field.Ax⁺[1:2, 1:2], field.px_q[1:2, 1:2]
+  field.ffthelper.pifft! * field.Ax⁺
+  @show mean(field.Ax⁺ ./ field.px_q)
+  @show std(field.Ax⁺ ./ field.px_q)
+  field.ffthelper.pfft! * field.Ax⁺
 end
 
