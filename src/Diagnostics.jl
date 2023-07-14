@@ -152,6 +152,9 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
     @timeit to "Fields" begin
       ti = d.ti[]
       if t % d.ntskip == 0
+        @timeit to "Prepare fields (i)fft!" begin
+          preparefieldsft!(f)
+        end
         @timeit to "Energy" begin
           d.fieldenergydensity[ti] = mean(abs2, f.EBxyz) / 2
         end
@@ -171,9 +174,6 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
         end
         d.totalenergydensity[] = totenergydensity
         d.totalmomentumdensitychange .= momentumdensitychange ./ momentumnormalisation
-      end
-      @timeit to "Prepare fields (i)fft!" begin
-        preparefieldsft!(f)
       end
       @timeit to "Field averaging" begin
         function average!(lhs, rhs)
