@@ -123,6 +123,21 @@ function restorefieldsft!(f::AbstractLorenzGaugeField)
   f.ffthelper.pfft! * f.ϕ⁰
 end
 
+function totalmomentumdensity(f::AbstractLorenzGaugeField)
+  px, py, pz = 0.0, 0.0, 0.0
+  @assert isapprox(abs(mean(f.Bx)), 0.0, atol=sqrt(eps()) * mean(f.B0))
+  @assert isapprox(abs(mean(f.By)), 0.0, atol=sqrt(eps()) * mean(f.B0))
+  @assert isapprox(abs(mean(f.Bz)), 0.0, atol=sqrt(eps()) * mean(f.B0))
+  for i in eachindex(f.Ex)
+    px += real(f.Ey[i]) * real(f.Bz[i] .+ f.B0[3])
+        - real(f.Ez[i]) * real(f.By[i] .+ f.B0[2])
+    py += real(f.Ez[i]) * real(f.Bx[i] .+ f.B0[1])
+        - real(f.Ex[i]) * real(f.Bz[i] .+ f.B0[3])
+    pz += real(f.Ex[i]) * real(f.By[i] .+ f.B0[2])
+        - real(f.Ey[i]) * real(f.Bx[i] .+ f.B0[1])
+  end
+  return (px, py, pz) ./ (f.gridparams.NX * f.gridparams.NY)
+end
 
 
 
@@ -141,19 +156,7 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
           d.fieldenergydensity[ti] = mean(abs2, f.EBxyz) / 2
         end
         @timeit to "Momentum" begin
-          px, py, pz = 0.0, 0.0, 0.0
-          @assert isapprox(abs(mean(f.Bx)), 0.0, atol=sqrt(eps()) * mean(f.B0))
-          @assert isapprox(abs(mean(f.By)), 0.0, atol=sqrt(eps()) * mean(f.B0))
-          @assert isapprox(abs(mean(f.Bz)), 0.0, atol=sqrt(eps()) * mean(f.B0))
-          for i in eachindex(f.Ex)
-            px += real(f.Ey[i]) * real(f.Bz[i] .+ f.B0[3])
-                - real(f.Ez[i]) * real(f.By[i] .+ f.B0[2])
-            py += real(f.Ez[i]) * real(f.Bx[i] .+ f.B0[1])
-                - real(f.Ex[i]) * real(f.Bz[i] .+ f.B0[3])
-            pz += real(f.Ex[i]) * real(f.By[i] .+ f.B0[2])
-                - real(f.Ey[i]) * real(f.Bx[i] .+ f.B0[1])
-          end
-          d.fieldmomentumdensity[ti] .= (px, py, pz) ./ length(f.Ex)
+          d.fieldmomentumdensity[ti] .= totalmomentumdensity(f)
         end
         totenergydensity = (d.fieldenergydensity[ti] + d.kineticenergydensity[ti]) / (d.fieldenergydensity[1] + d.kineticenergydensity[1])
         momentumdensity = d.fieldmomentumdensity[ti] + d.particlemomentumdensity[ti]

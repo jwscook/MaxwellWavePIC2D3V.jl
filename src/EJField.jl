@@ -63,13 +63,13 @@ function loop!(plasma, field::EJField, to, t)
   dt = timestep(field)
   Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
   NX_Lx, NY_Ly = field.gridparams.NX_Lx, field.gridparams.NY_Ly
+  NX, NY = field.gridparams.NX, field.gridparams.NY
   ΔV = cellvolume(field.gridparams)
 
   # Assume ρ and J are up to date at the current time (n+0)
   # At this point Ai⁰ stores the (n+0)th timestep value and Ai⁻ the (n-1)th
   #               ϕ⁰  stores the (n-1/2)th timestep value and ϕ⁻ the (n-3/2)th
   @timeit to "Field Forward FT" begin
-    field.ffthelper.pfft! * field.ρ⁰;
     field.ffthelper.pfft! * field.Jx⁺;
     field.ffthelper.pfft! * field.Jy⁺;
     field.ffthelper.pfft! * field.Jz⁺;
@@ -97,14 +97,17 @@ function loop!(plasma, field::EJField, to, t)
 
     @. f.ϕ⁰ = f.ρ⁺ / f.ffthelper.k² # ρ⁰
     f.ϕ⁰[1,1] = 0
-    @. f.Ax⁺ = f.Ax⁰ - dt * (f.Ex + f.Ex⁰)/2 - im * f.ffthelper.kx * f.ϕ⁰
-    @. f.Ay⁺ = f.Ay⁰ - dt * (f.Ey + f.Ey⁰)/2 - im * f.ffthelper.ky * f.ϕ⁰
-#    @. f.Az⁺ = f.Az⁰ - dt * (f.Ez + f.Ez⁰)/2
+    @. f.Ax⁺ = f.Ax⁰ - dt * f.ffthelper.k² * (f.Ex + f.Ex⁰) / 2 - im * f.ffthelper.kx * f.ϕ⁰
+    @. f.Ay⁺ = f.Ay⁰ - dt * f.ffthelper.k² * (f.Ey + f.Ey⁰) / 2 - im * f.ffthelper.ky * f.ϕ⁰
+    @. f.Az⁺ = f.Az⁰ - dt * f.ffthelper.k² * (f.Ez + f.Ez⁰) / 2
     f.Ax⁺[1,1] = f.Ay⁺[1,1] = f.Az⁺[1,1] = 0
-    @. f.Bz =  im * f.ffthelper.kx * f.Ay⁺
-    @. f.Bz -= im * f.ffthelper.ky * f.Ax⁺
     @. f.Bx = f.Bx - dt * im * f.ffthelper.ky * f.Ez
     @. f.By = f.By + dt * im * f.ffthelper.kx * f.Ez
+    @. f.Bz = f.Bz + dt * im * (f.ffthelper.kx * f.Ey - f.ffthelper.ky * f.Ex)
+    f.Bx[1,1] = f.By[1,1] = f.Bz[1,1] = 0
+    f.Ex[1,1] = f.Ey[1,1] = f.Ez[1,1] = 0
+    #@. f.Bz =  im * f.ffthelper.kx * f.Ay⁺
+    #@. f.Bz -= im * f.ffthelper.ky * f.Ax⁺
   end
 
   @timeit to "Field Inverse FT" begin
@@ -136,10 +139,13 @@ function loop!(plasma, field::EJField, to, t)
     field.Jx⁰ .= field.Jx⁺
     field.Jy⁰ .= field.Jy⁺
     field.Jz⁰ .= field.Jz⁺
+    field.Ax⁰ .= field.Ax⁺
+    field.Ay⁰ .= field.Ay⁺
+    field.Az⁰ .= field.Az⁺
   end
 
-
   @timeit to "Particle Loop" begin
+    particlemomenta = [zeros(3) for _ in 1:size(field.depositionbuffer, 4)]
     @threads for j in axes(field.depositionbuffer, 4)
       J⁰ = @view field.depositionbuffer[2:4, :, :, j]
       J⁰ .= 0
@@ -174,10 +180,12 @@ function loop!(plasma, field::EJField, to, t)
           y[i] = unimod(y[i] + (vxi + vy[i]) * dt/4, Ly)
           deposit!(ρ⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
                    qw_ΔV)
+          particlemomenta[j] .+= (vx[i], vy[i], vz[i]) .* (species.mass * species.weight)
         end
       end
     end
   end
+#  @show totalmomentumdensity(field) .+ sum(momentumdensity.(plasma, ΔV * NX * NY))
 
   @timeit to "Field Reduction" begin
     reduction!(field.ρ⁰, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.depositionbuffer)
@@ -193,9 +201,9 @@ function preparefieldsft!(f::EJField)
   f.ffthelper.pifft! * f.Jx⁰
   f.ffthelper.pifft! * f.Jy⁰
   f.ffthelper.pifft! * f.Jz⁰
-  f.ffthelper.pifft! * f.Ex⁰
-  f.ffthelper.pifft! * f.Ey⁰
-  f.ffthelper.pifft! * f.Ez⁰
+  f.ffthelper.pifft! * f.Ex
+  f.ffthelper.pifft! * f.Ey
+  f.ffthelper.pifft! * f.Ez
 end
 function restorefieldsft!(f::EJField)
   f.ffthelper.pfft! * f.Ax⁰
@@ -206,9 +214,9 @@ function restorefieldsft!(f::EJField)
   f.ffthelper.pfft! * f.Jx⁰
   f.ffthelper.pfft! * f.Jy⁰
   f.ffthelper.pfft! * f.Jz⁰
-  f.ffthelper.pfft! * f.Ex⁰
-  f.ffthelper.pfft! * f.Ey⁰
-  f.ffthelper.pfft! * f.Ez⁰
+  f.ffthelper.pfft! * f.Ex
+  f.ffthelper.pfft! * f.Ey
+  f.ffthelper.pfft! * f.Ez
 end
 
 function updatemomentum!(f::EJField)
