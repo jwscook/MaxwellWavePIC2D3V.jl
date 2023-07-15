@@ -149,12 +149,10 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
       volume = f.gridparams.Lx * f.gridparams.Ly
       diagnose!(d, plasma, volume, to)
     end
+    fieldsbacktonormal = true
     @timeit to "Fields" begin
       ti = d.ti[]
       if t % d.ntskip == 0
-        @timeit to "Prepare fields (i)fft!" begin
-          preparefieldsft!(f)
-        end
         @timeit to "Energy" begin
           d.fieldenergydensity[ti] = mean(abs2, f.EBxyz) / 2
         end
@@ -186,26 +184,22 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
             end
           end
         end
-        t0 = Threads.@spawn average!(d.Exs, f.Ex)
-        t1 = Threads.@spawn average!(d.Eys, f.Ey)
-        t2 = Threads.@spawn average!(d.Ezs, f.Ez)
-        t3 = Threads.@spawn average!(d.Bxs, f.Bx)
-        t4 = Threads.@spawn average!(d.Bys, f.By)
-        t5 = Threads.@spawn average!(d.Bzs, f.Bz)
-        t6 = Threads.@spawn average!(d.Axs, f.Ax⁰)
-        t7 = Threads.@spawn average!(d.Ays, f.Ay⁰)
-        t8 = Threads.@spawn average!(d.Azs, f.Az⁰)
-        t9 = Threads.@spawn average!(d.ϕs, f.ϕ⁰)
-        ta = Threads.@spawn average!(d.ρs, f.ρ⁰)
-        tb = Threads.@spawn average!(d.Jxs, f.Jx⁰)
-        tc = Threads.@spawn average!(d.Jys, f.Jy⁰)
-        td = Threads.@spawn average!(d.Jzs, f.Jz⁰)
-        wait.((t0, t1, t2, t3, t4, t5, t6,t7, t8, t9, ta, tb, tc, td))
-      end
-      @timeit to "Restore fields (i)fft!" begin
-        restorefieldsft!(f)
+        @timeit to "Prepare fields (i)fft!" begin
+          preparefieldsft!(f)
+          fieldsbacktonormal = false
+        end
+        ts = map(x->(Threads.@spawn average!(x[1], x[2])),
+          ((d.Exs, f.Ex), (d.Eys, f.Ey), (d.Ezs, f.Ez), (d.Bxs, f.Bx), (d.Bys, f.By),
+           (d.Bzs, f.Bz), (d.Axs, f.Ax⁰), (d.Ays, f.Ay⁰), (d.Azs, f.Az⁰), (d.ϕs, f.ϕ⁰),
+           (d.ρs, f.ρ⁰), (d.Jxs, f.Jx⁰), (d.Jys, f.Jy⁰), (d.Jzs, f.Jz⁰)))
+        wait.(ts)
+        @timeit to "Restore fields (i)fft!" begin
+          restorefieldsft!(f)
+          fieldsbacktonormal = true
+        end
       end
     end
+    @assert fieldsbacktonormal
   end
 end
 
