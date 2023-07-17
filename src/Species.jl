@@ -43,21 +43,26 @@ end
 
 nmacroparticles(s::Species) = length(s.p)
 thermalvelocity(s::Species) = std(velocities(s))
-kineticenergy(s::Species) = sum(abs2, velocities(s)) * s.mass / 2 * s.weight
+kineticenergy(s::Species) = ThreadsX.sum(abs2, velocities(s)) * s.mass / 2 * s.weight
 kineticenergydensity(s::Species, volume) = kineticenergy(s) / volume
 cyclotronfrequency(s::Species, B0) = s.charge * B0 / s.mass
 numberdensity(s::Species, volume) = (s.weight / volume * length(s.p))
 function plasmafrequency(s::Species, volume)
   return sqrt(s.charge^2 * numberdensity(s, volume) / s.mass)
 end
+function debyelength(s::Species, volume)
+  return thermalvelocity(s) / plasmafrequency(s, volume)
+end
 
 function velocityop(s::Species, op::F=identity) where F
-  #output = sum(op.(velocities(s)), dims=2)[:] * s.mass * s.weight
-  output = op(@MVector [0.0, 0.0, 0.0])
-  for v in eachcol(velocities(s))
-    output += op(v)
-  end
-  return output * s.weight
+  init = op(@MVector [0.0, 0.0, 0.0])
+  #vs = velocities(s)
+  #@tturbo for i in 1:nmacroparticles(s)
+  #  v = vs[:, i]
+  #  output += op(v)
+  #end
+  #return output * s.weight
+  return ThreadsX.sum(op, eachcol(velocities(s)), init=init) * s.weight
 end
 momentumdensity(s::Species, volume) = velocityop(s) * s.mass / volume
 energydensity(s::Species, volume) = 0.5 * velocityop(s, x->sum(abs2, x)) * s.mass / volume

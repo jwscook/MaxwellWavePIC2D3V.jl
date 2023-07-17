@@ -93,9 +93,6 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     field.ffthelper.pfft! * field.Jx⁰;
     field.ffthelper.pfft! * field.Jy⁰;
     field.ffthelper.pfft! * field.Jz⁰;
-    # smoothinfourierspace!(field.Jx⁰, field.ffthelper) # better for energy, worse for momentum
-    # smoothinfourierspace!(field.Jy⁰, field.ffthelper) # better for energy, worse for momentum
-    # smoothinfourierspace!(field.Jz⁰, field.ffthelper) # better for energy, worse for momentum
     field.ffthelper.pfft! * field.Ex
     field.ffthelper.pfft! * field.Ey
     field.ffthelper.pfft! * field.Ez
@@ -178,10 +175,12 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
           @assert all(isfinite, (x[i], y[i], vx[i], vy[i]))
-          x[i] = unimod(x[i] + vx[i] * dt, Lx)
-          y[i] = unimod(y[i] + vy[i] * dt, Ly)
+          x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
+          y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
           deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
+          x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
+          y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
         end
       end
     end
@@ -192,16 +191,15 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
 
 end
 
-function preparefieldsft!(f::LorenzGaugeField)
-  f.ffthelper.pifft! * f.Ax⁰
-  f.ffthelper.pifft! * f.Ay⁰
-  f.ffthelper.pifft! * f.Az⁰
-  f.ffthelper.pifft! * f.ϕ⁰
+
+function diagnosticsop!(op::F, f::LorenzGaugeField) where F
+  op * f.Ax⁰
+  op * f.Ay⁰
+  op * f.Az⁰
+  op * f.ϕ⁰
+  op * f.ρ⁰
 end
-function restorefieldsft!(f::LorenzGaugeField)
-  f.ffthelper.pfft! * f.Ax⁰
-  f.ffthelper.pfft! * f.Ay⁰
-  f.ffthelper.pfft! * f.Az⁰
-  f.ffthelper.pfft! * f.ϕ⁰
-end
+
+preparefieldsft!(f::LorenzGaugeField) = diagnosticsop!(f.ffthelper.pifft!, f)
+restorefieldsft!(f::LorenzGaugeField) = diagnosticsop!(f.ffthelper.pfft!, f)
 
