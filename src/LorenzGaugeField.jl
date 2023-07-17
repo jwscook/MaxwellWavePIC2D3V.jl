@@ -46,36 +46,37 @@ end
 
 function warmup!(field::LorenzGaugeField, plasma, to)
   return nothing
-  #@timeit to "Warmup" begin
-  #  dt = timestep(field)
-  #  Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
-  #  NX_Lx, NY_Ly = field.gridparams.NX_Lx, field.gridparams.NY_Ly
-  #  ΔV = cellvolume(field.gridparams)
-  #  advect!(plasma, field.gridparams, -dt, to) # n -1
-  #  @threads for j in axes(field.Js⁰, 4)
-  #    J⁰ = @view field.Js⁰[:, :, :, j]#[1, :, :, j]
-  #    J⁰ .= 0
-  #    for species in plasma
-  #      qw_ΔV = species.charge * species.weight / ΔV
-  #      q_m = species.charge / species.mass
-  #      x = @view positions(species)[1, :]
-  #      y = @view positions(species)[2, :]
-  #      vx = @view velocities(species)[1, :]
-  #      vy = @view velocities(species)[2, :]
-  #      vz = @view velocities(species)[3, :]
-  #      @inbounds for i in species.chunks[j]
-  #        #deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly, qw_ΔV)
-  #        deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
-  #          vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
-  #      end
-  #    end
-  #  end
-  #  #reduction!(field.ρ⁰, (@view field.Js⁰[1, :, :, :]))
-  #  reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰)
-  #  #neglaplacesolve!(field.ϕ⁰, field.ρ⁰, field.ffthelper)
-  #  advect!(plasma, field.gridparams, dt, to) # n
-  #  field.Js⁰ .= 0.0
-  #end
+  @timeit to "Warmup" begin
+    dt = timestep(field)
+    Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
+    NX_Lx, NY_Ly = field.gridparams.NX_Lx, field.gridparams.NY_Ly
+#    ΔV = cellvolume(field.gridparams)
+#    advect!(plasma, field.gridparams, -dt, to) # n -1
+    @threads for j in axes(field.Js⁰, 4)
+      J⁰ = @view field.Js⁰[:, :, :, j]#[1, :, :, j]
+      J⁰ .= 0
+      for species in plasma
+        qw_ΔV = species.charge * species.weight / ΔV
+        q_m = species.charge / species.mass
+        x = @view positions(species)[1, :]
+        y = @view positions(species)[2, :]
+        vx = @view velocities(species)[1, :]
+        vy = @view velocities(species)[2, :]
+        vz = @view velocities(species)[3, :]
+        @inbounds for i in species.chunks[j]
+          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
+          @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
+          vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
+            Bxi, Byi, Bzi, -0.5 * q_m); # minus sign here is to make it go backwards a dt/2
+        end
+      end
+    end
+#    #reduction!(field.ρ⁰, (@view field.Js⁰[1, :, :, :]))
+#    reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰)
+#    #neglaplacesolve!(field.ϕ⁰, field.ρ⁰, field.ffthelper)
+#    advect!(plasma, field.gridparams, dt, to) # n
+#    field.Js⁰ .= 0.0
+  end
 end
 
 function loop!(plasma, field::LorenzGaugeField, to, t)
@@ -174,12 +175,11 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
         @inbounds for i in species.chunks[j]
           Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
           @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
-          vxi, vyi = vx[i], vy[i]
           vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
-          @assert all(isfinite, (x[i], y[i], vxi, vyi, vx[i], vy[i]))
-          x[i] = unimod(x[i] + (vxi + vx[i]) * dt / 2, Lx)
-          y[i] = unimod(y[i] + (vyi + vy[i]) * dt / 2, Ly)
+          @assert all(isfinite, (x[i], y[i], vx[i], vy[i]))
+          x[i] = unimod(x[i] + vx[i] * dt, Lx)
+          y[i] = unimod(y[i] + vy[i] * dt, Ly)
           deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
             vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
         end
