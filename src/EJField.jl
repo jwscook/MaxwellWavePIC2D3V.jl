@@ -69,14 +69,6 @@ function loop!(plasma, field::EJField, to, t)
   # Assume ρ and J are up to date at the current time (n+0)
   # At this point Ai⁰ stores the (n+0)th timestep value and Ai⁻ the (n-1)th
   #               ϕ⁰  stores the (n-1/2)th timestep value and ϕ⁻ the (n-3/2)th
-  @timeit to "Field Forward FT" begin
-    field.ffthelper.pfft! * field.Jx⁺;
-    field.ffthelper.pfft! * field.Jy⁺;
-    field.ffthelper.pfft! * field.Jz⁺;
-    field.ffthelper.pfft! * field.Bx
-    field.ffthelper.pfft! * field.By
-    field.ffthelper.pfft! * field.Bz
-  end
 
   # ∂²E/∂t² = - ∂J/∂t - ∇ × (∇ × E)
   # ∂²E/∂t² = - ∂J/∂t - ∇(∇⋅E) + ∇^2 E
@@ -98,40 +90,37 @@ function loop!(plasma, field::EJField, to, t)
     f.Ex[1,1] = f.Ey[1,1] = f.Ez[1,1] = 0
     # either do this
     if true
-      @. f.Bx = f.Bx - dt * im * f.ffthelper.ky * f.Ez
-      @. f.By = f.By + dt * im * f.ffthelper.kx * f.Ez
-      @. f.Bz = f.Bz + dt * im * (f.ffthelper.kx * f.Ey - f.ffthelper.ky * f.Ex)
+      @. f.Bx = f.Bx - dt * im * f.ffthelper.ky * (f.Ez + f.Ez⁰)/2
+      @. f.By = f.By + dt * im * f.ffthelper.kx * (f.Ez + f.Ez⁰)/2
+      @. f.Bz = f.Bz + dt * im * (f.ffthelper.kx * (f.Ey + f.Ey⁰) - f.ffthelper.ky * (f.Ex+f.Ex⁰))/2
       # or this, they are equivalent
     else
-      @. f.ϕ⁰ = f.ρ⁺ / f.ffthelper.k² # ρ⁰
-      f.ϕ⁰[1,1] = 0
-      @. f.Ax⁺ = f.Ax⁰ - dt * ((f.Ex + f.Ex⁰) / 2 + im * f.ffthelper.kx * f.ϕ⁰)
-      @. f.Ay⁺ = f.Ay⁰ - dt * ((f.Ey + f.Ey⁰) / 2 + im * f.ffthelper.ky * f.ϕ⁰)
-      @. f.Az⁺ = f.Az⁰ - dt * ((f.Ez + f.Ez⁰) / 2)
-      f.Ax⁺[1,1] = f.Ay⁺[1,1] = f.Az⁺[1,1] = 0
-      @. f.Bx = im * (f.ffthelper.ky * (f.Az⁺ + f.Az⁰)) / 2
-      @. f.By = im * (-f.ffthelper.kx * (f.Az⁺ + f.Az⁰)) / 2
-      @. f.Bz = im * (f.ffthelper.kx * (f.Ay⁺ + f.Ay⁰) - f.ffthelper.ky * (f.Ax⁺ + f.Ax⁰))/ 2
+    #  @. f.ϕ⁰ = f.ρ⁺ / f.ffthelper.k² # ρ⁰
+    #  f.ϕ⁰[1,1] = 0
+    #  @. f.Ax⁺ = f.Ax⁰ - dt * ((f.Ex + f.Ex⁰) / 2 + im * f.ffthelper.kx * f.ϕ⁰)
+    #  @. f.Ay⁺ = f.Ay⁰ - dt * ((f.Ey + f.Ey⁰) / 2 + im * f.ffthelper.ky * f.ϕ⁰)
+    #  @. f.Az⁺ = f.Az⁰ - dt * ((f.Ez + f.Ez⁰) / 2)
+    #  f.Ax⁺[1,1] = f.Ay⁺[1,1] = f.Az⁺[1,1] = 0
+    #  @. f.Bx = im * (f.ffthelper.ky * (f.Az⁺ + f.Az⁰)) / 2
+    #  @. f.By = im * (-f.ffthelper.kx * (f.Az⁺ + f.Az⁰)) / 2
+    #  @. f.Bz = im * (f.ffthelper.kx * (f.Ay⁺ + f.Ay⁰) - f.ffthelper.ky * (f.Ax⁺ + f.Ax⁰))/ 2
     end
     f.Bx[1,1] = f.By[1,1] = f.Bz[1,1] = 0
   end
 
   @timeit to "Field Inverse FT" begin
-    field.ffthelper.pifft! * field.Ex
-    field.ffthelper.pifft! * field.Ey
-    field.ffthelper.pifft! * field.Ez
-    field.ffthelper.pifft! * field.Bx
-    field.ffthelper.pifft! * field.By
-    field.ffthelper.pifft! * field.Bz
+    for fi in (field.Ex, field.Ey, field.Ez, field.Bx, field.By, field.Bz)
+      field.ffthelper.pifft! * fi
+    end
   end
 
   @timeit to "Field Update" update!(field)
   # we now have the E and B fields at n+1/2
 
   @timeit to "Field Forward FT for buffers" begin
-    field.ffthelper.pfft! * field.Ex
-    field.ffthelper.pfft! * field.Ey
-    field.ffthelper.pfft! * field.Ez
+    for fi in (field.Ex, field.Ey, field.Ez, field.Bx, field.By, field.Bz)
+      field.ffthelper.pfft! * fi
+    end
   end
 
   @timeit to "Copy over buffers" begin
@@ -195,33 +184,26 @@ function loop!(plasma, field::EJField, to, t)
   @timeit to "Field Reduction" begin
     reduction!(field.ρ⁰, field.Jx⁺, field.Jy⁺, field.Jz⁺, field.depositionbuffer)
   end
+  @timeit to "Field Forward FT" begin
+    field.ffthelper.pfft! * field.Jx⁺;
+    field.ffthelper.pfft! * field.Jy⁺;
+    field.ffthelper.pfft! * field.Jz⁺;
+    field.ffthelper.pfft! * field.ρ⁰;
+  end
+end
 
+function diagnosticfftfields(f::EJField)
+  return (f.Ax⁰, f.Ay⁰, f.Az⁰, f.ϕ⁰, f.ρ⁰, f.Jx⁰, f.Jy⁰, f.Jz⁰, f.Bx, f.By, f.Bz)
 end
 function preparefieldsft!(f::EJField)
-  f.ffthelper.pifft! * f.Ax⁰
-  f.ffthelper.pifft! * f.Ay⁰
-  f.ffthelper.pifft! * f.Az⁰
-  f.ffthelper.pifft! * f.ϕ⁰
-  f.ffthelper.pifft! * f.ρ⁰
-  f.ffthelper.pifft! * f.Jx⁰
-  f.ffthelper.pifft! * f.Jy⁰
-  f.ffthelper.pifft! * f.Jz⁰
-  f.ffthelper.pifft! * f.Ex
-  f.ffthelper.pifft! * f.Ey
-  f.ffthelper.pifft! * f.Ez
+  for fi in diagnosticfftfields(f)
+    f.ffthelper.pifft! * fi
+  end
 end
 function restorefieldsft!(f::EJField)
-  f.ffthelper.pfft! * f.Ax⁰
-  f.ffthelper.pfft! * f.Ay⁰
-  f.ffthelper.pfft! * f.Az⁰
-  f.ffthelper.pfft! * f.ϕ⁰
-  f.ffthelper.pfft! * f.ρ⁰
-  f.ffthelper.pfft! * f.Jx⁰
-  f.ffthelper.pfft! * f.Jy⁰
-  f.ffthelper.pfft! * f.Jz⁰
-  f.ffthelper.pfft! * f.Ex
-  f.ffthelper.pfft! * f.Ey
-  f.ffthelper.pfft! * f.Ez
+  for fi in diagnosticfftfields(f)
+    f.ffthelper.pfft! * fi
+  end
 end
 
 function updatemomentum!(f::EJField)

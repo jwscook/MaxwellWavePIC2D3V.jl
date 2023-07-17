@@ -68,8 +68,8 @@ function pic()
     Lx = L0
     Ly = Lx * NY / NX
     dt = Lx / NX / 2
-    P = NX * NY * 8
-    NT = 2^12 # 2^14
+    P = NX * NY * 16
+    NT = 2^14
     Δx = Lx / NX
     Δx = Lx / NX
     Δy = Ly / NY
@@ -89,10 +89,10 @@ function pic()
     @show NT ÷ ntskip
     #dt = 2dl #/6vth
     #dt = dl / vth
-    #field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
-    #  imex=MaxwellWavePIC2D3V.ImEx(1), buffers=10)
-    field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+    field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
       imex=MaxwellWavePIC2D3V.ImEx(1), buffers=10)
+    #field = MaxwellWavePIC2D3V.EJField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
+    #  imex=MaxwellWavePIC2D3V.ImEx(1), buffers=10)
     #field = MaxwellWavePIC2D3V.LorenzGaugeSemiImplicitField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
     #  buffers=10, rtol=100eps(), maxiters=1000)
@@ -135,7 +135,7 @@ diagnostics, field, plasma, n0, vcharacteristic, omegacharacteristic, NT, B0 = p
 
 
 MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegacharacteristic, NT;
-                              cutoff=10 * omegacharacteristic)
+                              cutoff=100 * omegacharacteristic)
 
 const filecontents = [i for i in readlines(open(@__FILE__))]
 

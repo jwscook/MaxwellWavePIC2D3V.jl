@@ -125,9 +125,9 @@ end
 
 function totalmomentumdensity(f::AbstractLorenzGaugeField)
   px, py, pz = 0.0, 0.0, 0.0
-  @assert isapprox(abs(mean(f.Bx)), 0.0, atol=sqrt(eps()) * mean(f.B0))
-  @assert isapprox(abs(mean(f.By)), 0.0, atol=sqrt(eps()) * mean(f.B0))
-  @assert isapprox(abs(mean(f.Bz)), 0.0, atol=sqrt(eps()) * mean(f.B0))
+  @assert isapprox(mean(real.(f.Bx)), 0.0, atol=sqrt(eps()) * mean(f.B0)) "$(mean(real.(f.Bx)))"
+  @assert isapprox(mean(real.(f.By)), 0.0, atol=sqrt(eps()) * mean(f.B0)) "$(mean(real.(f.By)))"
+  @assert isapprox(mean(real.(f.Bz)), 0.0, atol=sqrt(eps()) * mean(f.B0)) "$(mean(real.(f.Bz)))"
   for i in eachindex(f.Ex)
     px += real(f.Ey[i]) * real(f.Bz[i] .+ f.B0[3])
         - real(f.Ez[i]) * real(f.By[i] .+ f.B0[2])
@@ -152,6 +152,10 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
     fieldsbacktonormal = true
     @timeit to "Fields" begin
       ti = d.ti[]
+      @timeit to "Prepare fields (i)fft!" begin
+        preparefieldsft!(f)
+        fieldsbacktonormal = false
+      end
       if t % d.ntskip == 0
         @timeit to "Energy" begin
           d.fieldenergydensity[ti] = mean(abs2, f.EBxyz) / 2
@@ -183,10 +187,6 @@ function diagnose!(d::LorenzGaugeDiagnostics, f::AbstractLorenzGaugeField, plasm
               lhs[il, jl, ti] += real(rhs[ir+ii, jr+jj]) * factor
             end
           end
-        end
-        @timeit to "Prepare fields (i)fft!" begin
-          preparefieldsft!(f)
-          fieldsbacktonormal = false
         end
         ts = map(x->(Threads.@spawn average!(x[1], x[2])),
           ((d.Exs, f.Ex), (d.Eys, f.Ey), (d.Ezs, f.Ez), (d.Bxs, f.Bx), (d.Bys, f.By),

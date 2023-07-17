@@ -1,0 +1,22 @@
+diff --git a/examples/Thermal.jl b/examples/Thermal.jl
+index 4d6baf5..1ffd810 100644
+--- a/examples/Thermal.jl
++++ b/examples/Thermal.jl
+@@ -69,7 +69,7 @@ function pic()
+     Ly = Lx * NY / NX
+     dt = Lx / NX / 2
+     P = NX * NY * 8
+-    NT = 2^12 # 2^14
++    NT = 256#2^12 # 2^14
+     Δx = Lx / NX
+     Δx = Lx / NX
+     Δy = Ly / NY
+@@ -84,7 +84,7 @@ function pic()
+     #dt = dl/6vth
+     #field = MaxwellWavePIC2D3V.ElectrostaticField(NX, NY, Lx, Ly, dt=dt, B0x=B0)
+     #diagnostics = MaxwellWavePIC2D3V.ElectrostaticDiagnostics(NX, NY, NT, ntskip, 2)
+-    ntskip = 16 #4#prevpow(2, round(Int, 10 / 6vth)) ÷ 4
++    ntskip = 1#16 #4#prevpow(2, round(Int, 10 / 6vth)) ÷ 4
+     ngskip = 4
+     @show NT ÷ ntskip
+     #dt = 2dl #/6vth

@@ -10,13 +10,13 @@ struct LorenzGaugeField{T, U} <: AbstractLorenzGaugeField
   Ax⁰::Array{ComplexF64, 2}
   Ay⁰::Array{ComplexF64, 2}
   Az⁰::Array{ComplexF64, 2}
-  Ex::Array{ComplexF64, 2}
-  Ey::Array{ComplexF64, 2}
-  Ez::Array{ComplexF64, 2}
   ρ⁰::Array{ComplexF64, 2}
   Jx⁰::Array{ComplexF64, 2}
   Jy⁰::Array{ComplexF64, 2}
   Jz⁰::Array{ComplexF64, 2}
+  Ex::Array{ComplexF64, 2}
+  Ey::Array{ComplexF64, 2}
+  Ez::Array{ComplexF64, 2}
   Bx::Array{ComplexF64, 2}
   By::Array{ComplexF64, 2}
   Bz::Array{ComplexF64, 2}
@@ -78,9 +78,6 @@ function warmup!(field::LorenzGaugeField, plasma, to)
   #end
 end
 
-
-
-
 function loop!(plasma, field::LorenzGaugeField, to, t)
   dt = timestep(field)
   Lx, Ly = field.gridparams.Lx, field.gridparams.Ly
@@ -89,6 +86,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
   # Assume ρ and J are up to date at the current time (n+0)
   # At this point Ai⁰ stores the (n+0)th timestep value and Ai⁻ the (n-1)th
   #               ϕ⁰  stores the (n-1/2)th timestep value and ϕ⁻ the (n-3/2)th
+
   @timeit to "Field Forward FT" begin
     #field.ffthelper.pfft! * field.ρ⁰; # field.ρ⁰ should always be in Fourier space
     field.ffthelper.pfft! * field.Jx⁰;
@@ -97,6 +95,12 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     # smoothinfourierspace!(field.Jx⁰, field.ffthelper) # better for energy, worse for momentum
     # smoothinfourierspace!(field.Jy⁰, field.ffthelper) # better for energy, worse for momentum
     # smoothinfourierspace!(field.Jz⁰, field.ffthelper) # better for energy, worse for momentum
+    field.ffthelper.pfft! * field.Ex
+    field.ffthelper.pfft! * field.Ey
+    field.ffthelper.pfft! * field.Ez
+    field.ffthelper.pfft! * field.Bx
+    field.ffthelper.pfft! * field.By
+    field.ffthelper.pfft! * field.Bz
     # not necessary given E, B calculated from derivatives of ϕ, Ai
     #field.ρ⁰[1, 1] = field.Jx⁰[1, 1] = field.Jy⁰[1, 1] = field.Jz⁰[1, 1] = 0
   end
@@ -185,5 +189,19 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
   @timeit to "Field Reduction" begin
     reduction!(field.Jx⁰, field.Jy⁰, field.Jz⁰, field.Js⁰)
   end
+
+end
+
+function preparefieldsft!(f::LorenzGaugeField)
+  f.ffthelper.pifft! * f.Ax⁰
+  f.ffthelper.pifft! * f.Ay⁰
+  f.ffthelper.pifft! * f.Az⁰
+  f.ffthelper.pifft! * f.ϕ⁰
+end
+function restorefieldsft!(f::LorenzGaugeField)
+  f.ffthelper.pfft! * f.Ax⁰
+  f.ffthelper.pfft! * f.Ay⁰
+  f.ffthelper.pfft! * f.Az⁰
+  f.ffthelper.pfft! * f.ϕ⁰
 end
 
