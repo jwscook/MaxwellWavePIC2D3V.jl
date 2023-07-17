@@ -139,6 +139,6 @@ MaxwellWavePIC2D3V.plotfields(diagnostics, field, n0, vcharacteristic, omegachar
 
 const filecontents = [i for i in readlines(open(@__FILE__))]
 
-@save "$(hash(filecontents))" filecontents diagnostics field plasma n0 vcharacteristic omegacharacteristic NT B0
+@save "$(hash(filecontents)).jld2" filecontents diagnostics field plasma n0 vcharacteristic omegacharacteristic NT B0
 
 
