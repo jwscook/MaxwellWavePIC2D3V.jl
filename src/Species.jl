@@ -56,12 +56,6 @@ end
 
 function velocityop(s::Species, op::F=identity) where F
   init = op(@MVector [0.0, 0.0, 0.0])
-  #vs = velocities(s)
-  #@tturbo for i in 1:nmacroparticles(s)
-  #  v = vs[:, i]
-  #  output += op(v)
-  #end
-  #return output * s.weight
   return ThreadsX.sum(op, eachcol(velocities(s)), init=init) * s.weight
 end
 momentumdensity(s::Species, volume) = velocityop(s) * s.mass / volume
