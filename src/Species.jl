@@ -42,7 +42,7 @@ function copyto!(dest::Species, src::Species)
 end
 
 nmacroparticles(s::Species) = length(s.p)
-thermalvelocity(s::Species) = std(velocities(s))
+thermalvelocity(s::Species) = std(velocities(s)) * sqrt(2)
 kineticenergy(s::Species) = ThreadsX.sum(abs2, velocities(s)) * s.mass / 2 * s.weight
 kineticenergydensity(s::Species, volume) = kineticenergy(s) / volume
 cyclotronfrequency(s::Species, B0) = s.charge * B0 / s.mass
