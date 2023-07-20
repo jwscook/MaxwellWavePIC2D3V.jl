@@ -153,14 +153,15 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
     @threads for j in axes(field.Js⁰, 4)
       J⁰ = @view field.Js⁰[:, :, :, j]
       J⁰ .= 0
+      dt_2 = dt / 2
       for species in plasma
         qw_ΔV = species.charge * species.weight / ΔV
         q_m = species.charge / species.mass
-        x = @view positions(species)[1, :]
-        y = @view positions(species)[2, :]
-        vx = @view velocities(species)[1, :]
-        vy = @view velocities(species)[2, :]
-        vz = @view velocities(species)[3, :]
+#        x = @view positions(species)[1, :]
+#        y = @view positions(species)[2, :]
+#        vx = @view velocities(species)[1, :]
+#        vy = @view velocities(species)[2, :]
+#        vz = @view velocities(species)[3, :]
         #  E.....E.....E
         #  B.....B.....B
         #  ...ϕ.....ϕ.....ϕ
@@ -170,17 +171,19 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
         #  x.....x.....x
         #  v.....v.....v
         @inbounds for i in species.chunks[j]
-          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x[i], y[i])
+          x, y, vx, vy, vz = (@view species.xyv[:, i])
+          Exi, Eyi, Ezi, Bxi, Byi, Bzi = field(species.shapes, x, y)
           @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
-          vx[i], vy[i], vz[i] = field.boris(vx[i], vy[i], vz[i], Exi, Eyi, Ezi,
+          vx, vy, vz = field.boris(vx, vy, vz, Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
-          @assert all(isfinite, (x[i], y[i], vx[i], vy[i]))
-          x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
-          y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
-          deposit!(J⁰, species.shapes, x[i], y[i], NX_Lx, NY_Ly,
-            vx[i] * qw_ΔV, vy[i] * qw_ΔV, vz[i] * qw_ΔV)
-          x[i] = unimod(x[i] + vx[i] * dt/2, Lx)
-          y[i] = unimod(y[i] + vy[i] * dt/2, Ly)
+          @assert all(isfinite, (x, y, vx, vy))
+          x = unimod(x + vx * dt_2, Lx)
+          y = unimod(y + vy * dt_2, Ly)
+          deposit!(J⁰, species.shapes, x, y, NX_Lx, NY_Ly,
+            vx * qw_ΔV, vy * qw_ΔV, vz * qw_ΔV)
+          x = unimod(x + vx * dt_2, Lx)
+          y = unimod(y + vy * dt_2, Ly)
+          @views species.xyv[:, i] .= (x, y, vx, vy, vz)
         end
       end
     end
