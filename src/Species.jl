@@ -1,13 +1,13 @@
 
-struct Species{S1<:AbstractShape, S2<:AbstractShape}
+struct Species{S1<:AbstractShape, S2<:AbstractShape, T<:Real}
   shapes::Tuple{S1, S2}
-  charge::Float64
-  mass::Float64
-  weight::Float64
-  xyv::Matrix{Float64}
+  charge::T
+  mass::T
+  weight::T
+  xyv::Matrix{T}
   p::Vector{Int}
-  chunks::Vector{UnitRange{Int}}
-  xyvwork::Matrix{Float64}
+  chunks::Vector{Step{Int,Int}}
+  xyvwork::Matrix{T}
 end
 
 function Species(P, vth, density, shapes::S; Lx, Ly, charge, mass,
@@ -20,7 +20,7 @@ function Species(P, vth, density, shapes::S; Lx, Ly, charge, mass,
   vx, vy, vz = velocityinitialiser()
   p = collect(1:P)
   xyv = Matrix(hcat(x, y, vx, vy, vz)')
-  chunks = collect(Iterators.partition(1:P, ceil(Int, P/nthreads())))
+  chunks = [((1 + i):nthreads():P) for i in 0:nthreads()-1]
   weight = calculateweight(density, P, Lx, Ly)
   shapes = length(shapes) == 1 ? (shapes, shapes) : tuple(shapes...)
   return Species(shapes, Float64(charge), Float64(mass), weight, xyv, p, chunks, deepcopy(xyv))
