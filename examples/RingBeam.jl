@@ -70,13 +70,13 @@ function pic()
   Ly = Lx * NY / NX
   dt = Lx / NX / 2
   P = NX * NY * 2
-  NT = 2^17
+  NT = 2^20
   Δx = Lx / NX
   Δx = Lx / NX
   Δy = Ly / NY
 
-  ntskip = 32
-  ngskip = (4,1)
+  ntskip = 512
+  ngskip = (2,1)
   @show NT ÷ ntskip
   field = MaxwellWavePIC2D3V.LorenzGaugeField(NX, NY, Lx, Ly, dt=dt, B0y=B0,
     imex=MaxwellWavePIC2D3V.ImEx(1), buffers=(10, 0))
@@ -86,7 +86,7 @@ function pic()
   #  fieldimex=MaxwellWavePIC2D3V.ImEx(1.0), sourceimex=MaxwellWavePIC2D3V.ImEx(0.05),
   #  buffers=(10, 0), rtol=sqrt(eps()), maxiters=1000)
   diagnostics = MaxwellWavePIC2D3V.LorenzGaugeDiagnostics(NX, NY, NT, ntskip, ngskip; makegifs=false)
-  shapes = (MaxwellWavePIC2D3V.BSplineWeighting{@stat 5}(), MaxwellWavePIC2D3V.NGPWeighting())#MaxwellWavePIC2D3V.BSplineWeighting{@stat -1}())
+  shapes = (MaxwellWavePIC2D3V.BSplineWeighting{@stat 2}(), MaxwellWavePIC2D3V.NGPWeighting())#MaxwellWavePIC2D3V.BSplineWeighting{@stat -1}())
   electrons = MaxwellWavePIC2D3V.Species(P, vth, n0, shapes;
     Lx=Lx, Ly=Ly, charge=-1, mass=Me)
   ions = MaxwellWavePIC2D3V.Species(P, vth / sqrt(Mi / Me), n0 * (1 - 1/1000), shapes,
@@ -117,7 +117,7 @@ function pic()
 
   show(to)
 
-  return diagnostics, field, plasma, n0, Va, abs(Ωe), NT, B0
+  return diagnostics, field, plasma, n0, Va, abs(Ωi), NT, B0
 end
 using StatProfilerHTML
 diagnostics, field, plasma, n0, vcharacteristic, omegacharacteristic, NT, B0 = pic()
