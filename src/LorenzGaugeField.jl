@@ -176,7 +176,7 @@ function loop!(plasma, field::LorenzGaugeField, to, t)
           @assert all(isfinite, (Exi, Eyi, Ezi, Bxi, Byi, Bzi))
           vx, vy, vz = field.boris(vx, vy, vz, Exi, Eyi, Ezi,
             Bxi, Byi, Bzi, q_m);
-          @assert all(isfinite, (x, y, vx, vy))
+          @assert all(isfinite, (x, y, vx, vy, vz))
           x = unimod(x + vx * dt_2, Lx)
           y = unimod(y + vy * dt_2, Ly)
           deposit!(J⁰, species.shapes, x, y, NX_Lx, NY_Ly,
